@@ -1,0 +1,2 @@
+# amneziawg-install
+AmneziaWG installer
