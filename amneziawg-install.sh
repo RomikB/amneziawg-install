@@ -262,8 +262,13 @@ function installAmneziaWG() {
 	# Install AmneziaWG tools and module
 	if [[ ${OS} == 'ubuntu' ]]; then
 		if [[ -e /etc/apt/sources.list.d/ubuntu.sources ]]; then
-			if ! grep "deb-src" /etc/apt/sources.list.d/ubuntu.sources; then
+			if ! grep -q "deb-src" /etc/apt/sources.list.d/ubuntu.sources; then
 				sed -i 's/deb/deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+			fi
+		else
+			if ! grep -q "^deb-src" /etc/apt/sources.list; then
+				cp /etc/apt/sources.list /etc/apt/sources.list.d/amneziawg.sources.list
+				sed -i 's/^deb/deb-src/' /etc/apt/sources.list.d/amneziawg.sources.list
 			fi
 		fi
 		add-apt-repository -y ppa:amnezia/ppa
@@ -577,6 +582,8 @@ function uninstallAmneziaWG() {
 				if grep "deb deb-src" /etc/apt/sources.list.d/ubuntu.sources; then
 					sed -i 's/deb deb-src/deb/' /etc/apt/sources.list.d/ubuntu.sources
 				fi
+			else
+				rm -f /etc/apt/sources.list.d/amneziawg.sources.list
 			fi
 		elif [[ ${OS} == 'debian' ]]; then
 			apt-get remove -y wireguard wireguard-tools qrencode
