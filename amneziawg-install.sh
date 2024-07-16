@@ -49,8 +49,8 @@ function checkOS() {
 			exit 1
 		fi
 	elif [[ ${OS} == "fedora" ]]; then
-		if [[ ${VERSION_ID} -lt 32 ]]; then
-			echo "Your version of Fedora (${VERSION_ID}) is not supported. Please use Fedora 32 or later"
+		if [[ ${VERSION_ID} -lt 39 ]]; then
+			echo "Your version of Fedora (${VERSION_ID}) is not supported. Please use Fedora 39 or later"
 			exit 1
 		fi
 	elif [[ ${OS} == 'centos' ]] || [[ ${OS} == 'almalinux' ]] || [[ ${OS} == 'rocky' ]]; then
@@ -58,13 +58,8 @@ function checkOS() {
 			echo "Your version of CentOS (${VERSION_ID}) is not supported. Please use CentOS 9 or later"
 			exit 1
 		fi
-	elif [[ -e /etc/oracle-release ]]; then
-		source /etc/os-release
-		OS=oracle
-	elif [[ -e /etc/arch-release ]]; then
-		OS=arch
 	else
-		echo "Looks like you aren't running this installer on a Debian, Ubuntu, Fedora, CentOS, AlmaLinux, Oracle or Arch Linux system"
+		echo "Looks like you aren't running this installer on a Debian, Ubuntu, Fedora, CentOS, AlmaLinux or Rocky Linux system"
 		exit 1
 	fi
 }
@@ -285,25 +280,15 @@ function installAmneziaWG() {
 		apt update
 		apt install -y amneziawg amneziawg-tools qrencode iptables
 	elif [[ ${OS} == 'fedora' ]]; then
-		if [[ ${VERSION_ID} -lt 32 ]]; then
-			dnf install -y dnf-plugins-core
-			dnf copr enable -y jdoss/wireguard
-			dnf install -y wireguard-dkms
-		fi
-		dnf install -y wireguard-tools iptables qrencode
+		dnf config-manager --set-enabled crb
+		dnf install -y epel-release
+		dnf copr enable -y amneziavpn/amneziawg
+		dnf install -y amneziawg-dkms amneziawg-tools qrencode iptables
 	elif [[ ${OS} == 'centos' ]] || [[ ${OS} == 'almalinux' ]] || [[ ${OS} == 'rocky' ]]; then
 		dnf config-manager --set-enabled crb
 		dnf install -y epel-release
 		dnf copr enable -y amneziavpn/amneziawg
 		dnf install -y amneziawg-dkms amneziawg-tools qrencode iptables
-	elif [[ ${OS} == 'oracle' ]]; then
-		dnf install -y oraclelinux-developer-release-el8
-		dnf config-manager --disable -y ol8_developer
-		dnf config-manager --enable -y ol8_developer_UEKR6
-		dnf config-manager --save -y --setopt=ol8_developer_UEKR6.includepkgs='wireguard-tools*'
-		dnf install -y wireguard-tools qrencode iptables
-	elif [[ ${OS} == 'arch' ]]; then
-		pacman -S --needed --noconfirm wireguard-tools qrencode
 	fi
 
 	SERVER_AWG_CONF="${AMNEZIAWG_DIR}/${SERVER_AWG_NIC}.conf"
@@ -588,18 +573,11 @@ function uninstallAmneziaWG() {
 			apt-key del 57290828
 			apt update
 		elif [[ ${OS} == 'fedora' ]]; then
-			dnf remove -y --noautoremove wireguard-tools qrencode
-			if [[ ${VERSION_ID} -lt 32 ]]; then
-				dnf remove -y --noautoremove wireguard-dkms
-				dnf copr disable -y jdoss/wireguard
-			fi
+			dnf remove -y amneziawg-dkms amneziawg-tools
+			dnf copr disable -y amneziavpn/amneziawg
 		elif [[ ${OS} == 'centos' ]] || [[ ${OS} == 'almalinux' ]] || [[ ${OS} == 'rocky' ]]; then
 			dnf remove -y amneziawg-dkms amneziawg-tools
 			dnf copr disable -y amneziavpn/amneziawg
-		elif [[ ${OS} == 'oracle' ]]; then
-			yum remove --noautoremove wireguard-tools qrencode
-		elif [[ ${OS} == 'arch' ]]; then
-			pacman -Rs --noconfirm wireguard-tools qrencode
 		fi
 
 		# Check if AmneziaWG is running
