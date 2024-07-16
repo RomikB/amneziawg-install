@@ -6,6 +6,7 @@
 
 Supported distributions:
 
+- AlmaLinux >= 9
 - Debian >= 11
 - Rocky Linux >= 9
 - Ubuntu >= 20.04
