@@ -6,17 +6,19 @@
 
 Supported distributions:
 
-- Debian >= 12
+- Debian >= 11
 - Ubuntu >= 20.04
 
 others can work but not tested
 
 ## Usage
 
+Before installation it is strictly recommended to upgrade your system to the latest available version and perform the reboot afterwards.
+
 Download and execute the script. Answer the questions asked by the script and it will take care of the rest.
 
 ```bash
-curl -O https://raw.githubusercontent.com/romikb/amneziawg-install/main/amneziawg-install.sh
+wget https://raw.githubusercontent.com/romikb/amneziawg-install/main/amneziawg-install.sh
 chmod +x amneziawg-install.sh
 ./amneziawg-install.sh
 ```
