@@ -44,8 +44,8 @@ function checkOS() {
 		OS=debian # overwrite if raspbian
 	elif [[ ${OS} == "ubuntu" ]]; then
 		RELEASE_YEAR=$(echo "${VERSION_ID}" | cut -d'.' -f1)
-		if [[ ${RELEASE_YEAR} -lt 18 ]]; then
-			echo "Your version of Ubuntu (${VERSION_ID}) is not supported. Please use Ubuntu 18.04 or later"
+		if [[ ${RELEASE_YEAR} -lt 20 ]]; then
+			echo "Your version of Ubuntu (${VERSION_ID}) is not supported. Please use Ubuntu 20.04 or later"
 			exit 1
 		fi
 	elif [[ ${OS} == "fedora" ]]; then
@@ -263,7 +263,8 @@ function installAmneziaWG() {
 	if [[ ${OS} == 'ubuntu' ]]; then
 		if [[ -e /etc/apt/sources.list.d/ubuntu.sources ]]; then
 			if ! grep -q "deb-src" /etc/apt/sources.list.d/ubuntu.sources; then
-				sed -i 's/deb/deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+				cp /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list.d/amneziawg.sources
+				sed -i 's/deb/deb-src/' /etc/apt/sources.list.d/amneziawg.sources
 			fi
 		else
 			if ! grep -q "^deb-src" /etc/apt/sources.list; then
@@ -579,9 +580,7 @@ function uninstallAmneziaWG() {
 			apt remove -y amneziawg amneziawg-tools qrencode
 			add-apt-repository -ry ppa:amnezia/ppa
 			if [[ -e /etc/apt/sources.list.d/ubuntu.sources ]]; then
-				if grep "deb deb-src" /etc/apt/sources.list.d/ubuntu.sources; then
-					sed -i 's/deb deb-src/deb/' /etc/apt/sources.list.d/ubuntu.sources
-				fi
+				rm -f /etc/apt/sources.list.d/amneziawg.sources
 			else
 				rm -f /etc/apt/sources.list.d/amneziawg.sources.list
 			fi

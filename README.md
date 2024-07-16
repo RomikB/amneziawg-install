@@ -6,7 +6,7 @@
 
 Supported distributions:
 
-- Ubuntu >= 22.04
+- Ubuntu >= 20.04
 
 others can work but not tested
 
