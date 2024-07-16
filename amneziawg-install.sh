@@ -54,8 +54,8 @@ function checkOS() {
 			exit 1
 		fi
 	elif [[ ${OS} == 'centos' ]] || [[ ${OS} == 'almalinux' ]] || [[ ${OS} == 'rocky' ]]; then
-		if [[ ${VERSION_ID} == 7* ]]; then
-			echo "Your version of CentOS (${VERSION_ID}) is not supported. Please use CentOS 8 or later"
+		if [[ ${VERSION_ID} == 7* ]] || [[ ${VERSION_ID} == 8* ]]; then
+			echo "Your version of CentOS (${VERSION_ID}) is not supported. Please use CentOS 9 or later"
 			exit 1
 		fi
 	elif [[ -e /etc/oracle-release ]]; then
@@ -292,12 +292,10 @@ function installAmneziaWG() {
 		fi
 		dnf install -y wireguard-tools iptables qrencode
 	elif [[ ${OS} == 'centos' ]] || [[ ${OS} == 'almalinux' ]] || [[ ${OS} == 'rocky' ]]; then
-		if [[ ${VERSION_ID} == 8* ]]; then
-			yum install -y epel-release elrepo-release
-			yum install -y kmod-wireguard
-			yum install -y qrencode # not available on release 9
-		fi
-		yum install -y wireguard-tools iptables
+		dnf config-manager --set-enabled crb
+		dnf install -y epel-release
+		dnf copr enable -y amneziavpn/amneziawg
+		dnf install -y amneziawg-dkms amneziawg-tools qrencode iptables
 	elif [[ ${OS} == 'oracle' ]]; then
 		dnf install -y oraclelinux-developer-release-el8
 		dnf config-manager --disable -y ol8_developer
@@ -596,10 +594,8 @@ function uninstallAmneziaWG() {
 				dnf copr disable -y jdoss/wireguard
 			fi
 		elif [[ ${OS} == 'centos' ]] || [[ ${OS} == 'almalinux' ]] || [[ ${OS} == 'rocky' ]]; then
-			yum remove -y --noautoremove wireguard-tools
-			if [[ ${VERSION_ID} == 8* ]]; then
-				yum remove --noautoremove kmod-wireguard qrencode
-			fi
+			dnf remove -y amneziawg-dkms amneziawg-tools
+			dnf copr disable -y amneziavpn/amneziawg
 		elif [[ ${OS} == 'oracle' ]]; then
 			yum remove --noautoremove wireguard-tools qrencode
 		elif [[ ${OS} == 'arch' ]]; then

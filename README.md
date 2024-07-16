@@ -7,6 +7,7 @@
 Supported distributions:
 
 - Debian >= 11
+- Rocky Linux >= 9
 - Ubuntu >= 20.04
 
 others can work but not tested
