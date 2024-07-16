@@ -6,6 +6,7 @@
 
 Supported distributions:
 
+- Debian >= 12
 - Ubuntu >= 20.04
 
 others can work but not tested

@@ -37,8 +37,8 @@ function checkOS() {
 	source /etc/os-release
 	OS="${ID}"
 	if [[ ${OS} == "debian" || ${OS} == "raspbian" ]]; then
-		if [[ ${VERSION_ID} -lt 10 ]]; then
-			echo "Your version of Debian (${VERSION_ID}) is not supported. Please use Debian 10 Buster or later"
+		if [[ ${VERSION_ID} -lt 11 ]]; then
+			echo "Your version of Debian (${VERSION_ID}) is not supported. Please use Debian 11 Bullseye or later"
 			exit 1
 		fi
 		OS=debian # overwrite if raspbian
@@ -274,16 +274,16 @@ function installAmneziaWG() {
 		fi
 		add-apt-repository -y ppa:amnezia/ppa
 		apt install -y amneziawg amneziawg-tools qrencode
-	elif [[ ${OS} == 'debian' && ${VERSION_ID} -gt 10 ]]; then
-		apt-get install -y amneziawg amneziawg-tools qrencode
 	elif [[ ${OS} == 'debian' ]]; then
-		if ! grep -rqs "^deb .* buster-backports" /etc/apt/; then
-			echo "deb http://deb.debian.org/debian buster-backports main" >/etc/apt/sources.list.d/backports.list
-			apt-get update
+		if ! grep -q "^deb-src" /etc/apt/sources.list; then
+			cp /etc/apt/sources.list /etc/apt/sources.list.d/amneziawg.sources.list
+			sed -i 's/^deb/deb-src/' /etc/apt/sources.list.d/amneziawg.sources.list
 		fi
+		apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 57290828
+		echo "deb https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu focal main" >>/etc/apt/sources.list.d/amneziawg.sources.list
+		echo "deb-src https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu focal main" >>/etc/apt/sources.list.d/amneziawg.sources.list
 		apt update
-		apt-get install -y iptables resolvconf qrencode
-		apt-get install -y -t buster-backports wireguard
+		apt install -y amneziawg amneziawg-tools qrencode iptables
 	elif [[ ${OS} == 'fedora' ]]; then
 		if [[ ${VERSION_ID} -lt 32 ]]; then
 			dnf install -y dnf-plugins-core
@@ -577,7 +577,7 @@ function uninstallAmneziaWG() {
 		rm -rf ${AMNEZIAWG_DIR}/*
 
 		if [[ ${OS} == 'ubuntu' ]]; then
-			apt remove -y amneziawg amneziawg-tools qrencode
+			apt remove -y amneziawg amneziawg-tools
 			add-apt-repository -ry ppa:amnezia/ppa
 			if [[ -e /etc/apt/sources.list.d/ubuntu.sources ]]; then
 				rm -f /etc/apt/sources.list.d/amneziawg.sources
@@ -585,7 +585,10 @@ function uninstallAmneziaWG() {
 				rm -f /etc/apt/sources.list.d/amneziawg.sources.list
 			fi
 		elif [[ ${OS} == 'debian' ]]; then
-			apt-get remove -y wireguard wireguard-tools qrencode
+			apt-get remove -y amneziawg amneziawg-tools
+			rm -f /etc/apt/sources.list.d/amneziawg.sources.list
+			apt-key del 57290828
+			apt update
 		elif [[ ${OS} == 'fedora' ]]; then
 			dnf remove -y --noautoremove wireguard-tools qrencode
 			if [[ ${VERSION_ID} -lt 32 ]]; then
