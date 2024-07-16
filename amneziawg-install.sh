@@ -104,56 +104,56 @@ function initialCheck() {
 }
 
 function readJminAndJmax() {
-    SERVER_AWG_JMIN=0
-    SERVER_AWG_JMAX=0
-    until [[ ${SERVER_AWG_JMIN} =~ ^[0-9]+$ ]] && (( ${SERVER_AWG_JMIN} >= 1 )) && (( ${SERVER_AWG_JMIN} <= 1280 )); do
-        read -rp "Server AmneziaWG Jmin [1-1280]: " -e -i 50 SERVER_AWG_JMIN
-    done
-    until [[ ${SERVER_AWG_JMAX} =~ ^[0-9]+$ ]] && (( ${SERVER_AWG_JMAX} >= 1 )) && (( ${SERVER_AWG_JMAX} <= 1280 )); do
-        read -rp "Server AmneziaWG Jmax [1-1280]: " -e -i 1000 SERVER_AWG_JMAX
-    done
+	SERVER_AWG_JMIN=0
+	SERVER_AWG_JMAX=0
+	until [[ ${SERVER_AWG_JMIN} =~ ^[0-9]+$ ]] && (( ${SERVER_AWG_JMIN} >= 1 )) && (( ${SERVER_AWG_JMIN} <= 1280 )); do
+		read -rp "Server AmneziaWG Jmin [1-1280]: " -e -i 50 SERVER_AWG_JMIN
+	done
+	until [[ ${SERVER_AWG_JMAX} =~ ^[0-9]+$ ]] && (( ${SERVER_AWG_JMAX} >= 1 )) && (( ${SERVER_AWG_JMAX} <= 1280 )); do
+		read -rp "Server AmneziaWG Jmax [1-1280]: " -e -i 1000 SERVER_AWG_JMAX
+	done
 }
 
 function generateS1AndS2() {
-    RANDOM_AWG_S1=$(shuf -i15-150 -n1)
-    RANDOM_AWG_S2=$(shuf -i15-150 -n1)
+	RANDOM_AWG_S1=$(shuf -i15-150 -n1)
+	RANDOM_AWG_S2=$(shuf -i15-150 -n1)
 }
 
 function readS1AndS2() {
-    SERVER_AWG_S1=0
-    SERVER_AWG_S2=0
-    until [[ ${SERVER_AWG_S1} =~ ^[0-9]+$ ]] && (( ${SERVER_AWG_S1} >= 15 )) && (( ${SERVER_AWG_S1} <= 150 )); do
-        read -rp "Server AmneziaWG S1 [15-150]: " -e -i ${RANDOM_AWG_S1} SERVER_AWG_S1
-    done
-    until [[ ${SERVER_AWG_S2} =~ ^[0-9]+$ ]] && (( ${SERVER_AWG_S2} >= 15 )) && (( ${SERVER_AWG_S2} <= 150 )); do
-	    read -rp "Server AmneziaWG S2 [15-150]: " -e -i ${RANDOM_AWG_S2} SERVER_AWG_S2
-    done
+	SERVER_AWG_S1=0
+	SERVER_AWG_S2=0
+	until [[ ${SERVER_AWG_S1} =~ ^[0-9]+$ ]] && (( ${SERVER_AWG_S1} >= 15 )) && (( ${SERVER_AWG_S1} <= 150 )); do
+		read -rp "Server AmneziaWG S1 [15-150]: " -e -i ${RANDOM_AWG_S1} SERVER_AWG_S1
+	done
+	until [[ ${SERVER_AWG_S2} =~ ^[0-9]+$ ]] && (( ${SERVER_AWG_S2} >= 15 )) && (( ${SERVER_AWG_S2} <= 150 )); do
+		read -rp "Server AmneziaWG S2 [15-150]: " -e -i ${RANDOM_AWG_S2} SERVER_AWG_S2
+	done
 }
 
 function generateH1AndH2AndH3AndH4() {
-    RANDOM_AWG_H1=$(shuf -i5-2147483647 -n1)
-    RANDOM_AWG_H2=$(shuf -i5-2147483647 -n1)
-    RANDOM_AWG_H3=$(shuf -i5-2147483647 -n1)
-    RANDOM_AWG_H4=$(shuf -i5-2147483647 -n1)
+	RANDOM_AWG_H1=$(shuf -i5-2147483647 -n1)
+	RANDOM_AWG_H2=$(shuf -i5-2147483647 -n1)
+	RANDOM_AWG_H3=$(shuf -i5-2147483647 -n1)
+	RANDOM_AWG_H4=$(shuf -i5-2147483647 -n1)
 }
 
 function readH1AndH2AndH3AndH4() {
-    SERVER_AWG_H1=0
-    SERVER_AWG_H2=0
-    SERVER_AWG_H3=0
-    SERVER_AWG_H4=0
-    until [[ ${SERVER_AWG_H1} =~ ^[0-9]+$ ]] && (( ${SERVER_AWG_H1} >= 5 )) && (( ${SERVER_AWG_H1} <= 2147483647 )); do
-        read -rp "Server AmneziaWG H1 [5-2147483647]: " -e -i ${RANDOM_AWG_H1} SERVER_AWG_H1
-    done
-    until [[ ${SERVER_AWG_H2} =~ ^[0-9]+$ ]] && (( ${SERVER_AWG_H2} >= 5 )) && (( ${SERVER_AWG_H2} <= 2147483647 )); do
-        read -rp "Server AmneziaWG H2 [5-2147483647]: " -e -i ${RANDOM_AWG_H2} SERVER_AWG_H2
-    done
-    until [[ ${SERVER_AWG_H3} =~ ^[0-9]+$ ]] && (( ${SERVER_AWG_H3} >= 5 )) && (( ${SERVER_AWG_H3} <= 2147483647 )); do
-        read -rp "Server AmneziaWG H3 [5-2147483647]: " -e -i ${RANDOM_AWG_H3} SERVER_AWG_H3
-    done
-    until [[ ${SERVER_AWG_H4} =~ ^[0-9]+$ ]] && (( ${SERVER_AWG_H4} >= 5 )) && (( ${SERVER_AWG_H4} <= 2147483647 )); do
-        read -rp "Server AmneziaWG H4 [5-2147483647]: " -e -i ${RANDOM_AWG_H4} SERVER_AWG_H4
-    done
+	SERVER_AWG_H1=0
+	SERVER_AWG_H2=0
+	SERVER_AWG_H3=0
+	SERVER_AWG_H4=0
+	until [[ ${SERVER_AWG_H1} =~ ^[0-9]+$ ]] && (( ${SERVER_AWG_H1} >= 5 )) && (( ${SERVER_AWG_H1} <= 2147483647 )); do
+		read -rp "Server AmneziaWG H1 [5-2147483647]: " -e -i ${RANDOM_AWG_H1} SERVER_AWG_H1
+	done
+	until [[ ${SERVER_AWG_H2} =~ ^[0-9]+$ ]] && (( ${SERVER_AWG_H2} >= 5 )) && (( ${SERVER_AWG_H2} <= 2147483647 )); do
+		read -rp "Server AmneziaWG H2 [5-2147483647]: " -e -i ${RANDOM_AWG_H2} SERVER_AWG_H2
+	done
+	until [[ ${SERVER_AWG_H3} =~ ^[0-9]+$ ]] && (( ${SERVER_AWG_H3} >= 5 )) && (( ${SERVER_AWG_H3} <= 2147483647 )); do
+		read -rp "Server AmneziaWG H3 [5-2147483647]: " -e -i ${RANDOM_AWG_H3} SERVER_AWG_H3
+	done
+	until [[ ${SERVER_AWG_H4} =~ ^[0-9]+$ ]] && (( ${SERVER_AWG_H4} >= 5 )) && (( ${SERVER_AWG_H4} <= 2147483647 )); do
+		read -rp "Server AmneziaWG H4 [5-2147483647]: " -e -i ${RANDOM_AWG_H4} SERVER_AWG_H4
+	done
 }
 
 function installQuestions() {
@@ -214,40 +214,40 @@ function installQuestions() {
 		fi
 	done
 
-    # Jc
-    RANDOM_AWG_JC=$(shuf -i3-10 -n1)
-    until [[ ${SERVER_AWG_JC} =~ ^[0-9]+$ ]] && (( ${SERVER_AWG_JC} >= 1 )) && (( ${SERVER_AWG_JC} <= 128 )); do
+	# Jc
+	RANDOM_AWG_JC=$(shuf -i3-10 -n1)
+	until [[ ${SERVER_AWG_JC} =~ ^[0-9]+$ ]] && (( ${SERVER_AWG_JC} >= 1 )) && (( ${SERVER_AWG_JC} <= 128 )); do
 		read -rp "Server AmneziaWG Jc [1-128]: " -e -i ${RANDOM_AWG_JC} SERVER_AWG_JC
 	done
 
-    # Jmin && Jmax
-    readJminAndJmax
-    until [ "${SERVER_AWG_JMIN}" -le "${SERVER_AWG_JMAX}" ]; do
-        echo "AmneziaWG require Jmin < Jmax"
-        readJminAndJmax
-    done
+	# Jmin && Jmax
+	readJminAndJmax
+	until [ "${SERVER_AWG_JMIN}" -le "${SERVER_AWG_JMAX}" ]; do
+		echo "AmneziaWG require Jmin < Jmax"
+		readJminAndJmax
+	done
 
-    # S1 && S2
-    generateS1AndS2
-    while (( ${RANDOM_AWG_S1} + 56 == ${RANDOM_AWG_S2} )); do
-        generateS1AndS2
-    done
-    readS1AndS2
-    while (( ${SERVER_AWG_S1} + 56 == ${SERVER_AWG_S2} )); do
-        echo "AmneziaWG require S1 + 56 <> S2"
-        readS1AndS2
-    done
+	# S1 && S2
+	generateS1AndS2
+	while (( ${RANDOM_AWG_S1} + 56 == ${RANDOM_AWG_S2} )); do
+		generateS1AndS2
+	done
+	readS1AndS2
+	while (( ${SERVER_AWG_S1} + 56 == ${SERVER_AWG_S2} )); do
+		echo "AmneziaWG require S1 + 56 <> S2"
+		readS1AndS2
+	done
 
-    # H1 && H2 && H3 && H4
-    generateH1AndH2AndH3AndH4
-    while (( ${RANDOM_AWG_H1} == ${RANDOM_AWG_H2} )) || (( ${RANDOM_AWG_H1} == ${RANDOM_AWG_H3} )) || (( ${RANDOM_AWG_H1} == ${RANDOM_AWG_H4} )) || (( ${RANDOM_AWG_H2} == ${RANDOM_AWG_H3} )) || (( ${RANDOM_AWG_H2} == ${RANDOM_AWG_H4} )) || (( ${RANDOM_AWG_H3} == ${RANDOM_AWG_H4} )); do
-        generateH1AndH2AndH3AndH4
-    done
-    readH1AndH2AndH3AndH4
-    while (( ${SERVER_AWG_H1} == ${SERVER_AWG_H2} )) || (( ${SERVER_AWG_H1} == ${SERVER_AWG_H3} )) || (( ${SERVER_AWG_H1} == ${SERVER_AWG_H4} )) || (( ${SERVER_AWG_H2} == ${SERVER_AWG_H3} )) || (( ${SERVER_AWG_H2} == ${SERVER_AWG_H4} )) || (( ${SERVER_AWG_H3} == ${SERVER_AWG_H4} )); do
-        echo "AmneziaWG require H1 and H2 and H3 and H4 be different"
-        readH1AndH2AndH3AndH4
-    done
+	# H1 && H2 && H3 && H4
+	generateH1AndH2AndH3AndH4
+	while (( ${RANDOM_AWG_H1} == ${RANDOM_AWG_H2} )) || (( ${RANDOM_AWG_H1} == ${RANDOM_AWG_H3} )) || (( ${RANDOM_AWG_H1} == ${RANDOM_AWG_H4} )) || (( ${RANDOM_AWG_H2} == ${RANDOM_AWG_H3} )) || (( ${RANDOM_AWG_H2} == ${RANDOM_AWG_H4} )) || (( ${RANDOM_AWG_H3} == ${RANDOM_AWG_H4} )); do
+		generateH1AndH2AndH3AndH4
+	done
+	readH1AndH2AndH3AndH4
+	while (( ${SERVER_AWG_H1} == ${SERVER_AWG_H2} )) || (( ${SERVER_AWG_H1} == ${SERVER_AWG_H3} )) || (( ${SERVER_AWG_H1} == ${SERVER_AWG_H4} )) || (( ${SERVER_AWG_H2} == ${SERVER_AWG_H3} )) || (( ${SERVER_AWG_H2} == ${SERVER_AWG_H4} )) || (( ${SERVER_AWG_H3} == ${SERVER_AWG_H4} )); do
+		echo "AmneziaWG require H1 and H2 and H3 and H4 be different"
+		readH1AndH2AndH3AndH4
+	done
 
 	echo ""
 	echo "Okay, that was all I needed. We are ready to setup your AmneziaWG server now."
@@ -260,7 +260,15 @@ function installAmneziaWG() {
 	installQuestions
 
 	# Install AmneziaWG tools and module
-	if [[ ${OS} == 'ubuntu' ]] || [[ ${OS} == 'debian' && ${VERSION_ID} -gt 10 ]]; then
+	if [[ ${OS} == 'ubuntu' ]]; then
+		if [[ -e /etc/apt/sources.list.d/ubuntu.sources ]]; then
+			if ! grep "deb-src" /etc/apt/sources.list.d/ubuntu.sources; then
+				sed -i 's/deb/deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+			fi
+		fi
+		add-apt-repository -y ppa:amnezia/ppa
+		apt install -y amneziawg amneziawg-tools qrencode
+	elif [[ ${OS} == 'debian' && ${VERSION_ID} -gt 10 ]]; then
 		apt-get install -y amneziawg amneziawg-tools qrencode
 	elif [[ ${OS} == 'debian' ]]; then
 		if ! grep -rqs "^deb .* buster-backports" /etc/apt/; then
@@ -294,7 +302,7 @@ function installAmneziaWG() {
 		pacman -S --needed --noconfirm wireguard-tools qrencode
 	fi
 
-    SERVER_AWG_CONF="${AMNEZIAWG_DIR}/${SERVER_AWG_NIC}.conf"
+	SERVER_AWG_CONF="${AMNEZIAWG_DIR}/${SERVER_AWG_NIC}.conf"
 
 	SERVER_PRIV_KEY=$(awg genkey)
 	SERVER_PUB_KEY=$(echo "${SERVER_PRIV_KEY}" | awg pubkey)
@@ -555,15 +563,21 @@ function uninstallAmneziaWG() {
 		systemctl stop "awg-quick@${SERVER_AWG_NIC}"
 		systemctl disable "awg-quick@${SERVER_AWG_NIC}"
 
-        # Disable routing
+		# Disable routing
 		rm -f /etc/sysctl.d/awg.conf
 		sysctl --system
 
-        # Remove config files
+		# Remove config files
 		rm -rf ${AMNEZIAWG_DIR}/*
 
 		if [[ ${OS} == 'ubuntu' ]]; then
 			apt remove -y amneziawg amneziawg-tools qrencode
+			add-apt-repository -ry ppa:amnezia/ppa
+			if [[ -e /etc/apt/sources.list.d/ubuntu.sources ]]; then
+				if grep "deb deb-src" /etc/apt/sources.list.d/ubuntu.sources; then
+					sed -i 's/deb deb-src/deb/' /etc/apt/sources.list.d/ubuntu.sources
+				fi
+			fi
 		elif [[ ${OS} == 'debian' ]]; then
 			apt-get remove -y wireguard wireguard-tools qrencode
 		elif [[ ${OS} == 'fedora' ]]; then
@@ -601,8 +615,8 @@ function uninstallAmneziaWG() {
 }
 
 function loadParams() {
-    source "${AMNEZIAWG_DIR}/params"
-    SERVER_AWG_CONF="${AMNEZIAWG_DIR}/${SERVER_AWG_NIC}.conf"
+	source "${AMNEZIAWG_DIR}/params"
+	SERVER_AWG_CONF="${AMNEZIAWG_DIR}/${SERVER_AWG_NIC}.conf"
 }
 
 function manageMenu() {
