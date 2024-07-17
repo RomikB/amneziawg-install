@@ -267,6 +267,7 @@ function installAmneziaWG() {
 				sed -i 's/^deb/deb-src/' /etc/apt/sources.list.d/amneziawg.sources.list
 			fi
 		fi
+		apt install -y software-properties-common
 		add-apt-repository -y ppa:amnezia/ppa
 		apt install -y amneziawg amneziawg-tools qrencode
 	elif [[ ${OS} == 'debian' ]]; then
