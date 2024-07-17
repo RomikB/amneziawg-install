@@ -17,13 +17,25 @@ others can work but not tested
 
 Before installation it is strictly recommended to upgrade your system to the latest available version and perform the reboot afterwards.
 
-Download and execute the script. Answer the questions asked by the script and it will take care of the rest.
-
+Use curl or wget to download the script:
+```bash
+curl -O https://raw.githubusercontent.com/romikb/amneziawg-install/main/amneziawg-install.sh
+```
 ```bash
 wget https://raw.githubusercontent.com/romikb/amneziawg-install/main/amneziawg-install.sh
+```
+
+Set permissions:
+```bash
 chmod +x amneziawg-install.sh
+```
+
+And execute:
+```bash
 ./amneziawg-install.sh
 ```
+
+Answer the questions asked by the script and it will take care of the rest.
 
 It will install AmneziaWG (kernel module and tools) on the server, configure it, create a systemd service and a client configuration file.
 
