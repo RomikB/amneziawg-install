@@ -13,6 +13,8 @@ Supported distributions:
 
 others can work but not tested
 
+2Gb of free space is required for temporary files.
+
 ## Usage
 
 Before installation it is strictly recommended to upgrade your system to the latest available version and perform the reboot afterwards.
