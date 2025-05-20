@@ -262,7 +262,7 @@ function installAmneziaWG() {
 	# Install AmneziaWG tools and module
 	if [[ ${OS} == 'ubuntu' ]]; then
 		if [[ -e /etc/apt/sources.list.d/ubuntu.sources ]]; then
-			if ! grep -q "deb-src" /etc/apt/sources.list.d/ubuntu.sources; then
+			if ! grep -q "^[^#].*deb-src" /etc/apt/sources.list.d/ubuntu.sources; then
 				cp /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list.d/amneziawg.sources
 				sed -i 's/deb/deb-src/' /etc/apt/sources.list.d/amneziawg.sources
 			fi
