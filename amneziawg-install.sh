@@ -280,6 +280,7 @@ function installAmneziaWG() {
 			cp /etc/apt/sources.list /etc/apt/sources.list.d/amneziawg.sources.list
 			sed -i 's/^deb/deb-src/' /etc/apt/sources.list.d/amneziawg.sources.list
 		fi
+		if ! command -v gpg &> /dev/null; then apt install -y gnupg; fi
 		apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 57290828
 		echo "deb https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu focal main" >>/etc/apt/sources.list.d/amneziawg.sources.list
 		echo "deb-src https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu focal main" >>/etc/apt/sources.list.d/amneziawg.sources.list
