@@ -552,6 +552,41 @@ function revokeClient() {
 	awg syncconf "${SERVER_AWG_NIC}" <(awg-quick strip "${SERVER_AWG_NIC}")
 }
 
+function showClientQR() {
+    NUMBER_OF_CLIENTS=$(grep -c -E "^### Client" "${SERVER_AWG_CONF}")
+    if [[ ${NUMBER_OF_CLIENTS} -eq 0 ]]; then
+        echo ""
+        echo "You have no existing clients!"
+        exit 1
+    fi
+
+    echo ""
+    echo "Select the client to show QR code"
+    grep -E "^### Client" "${SERVER_AWG_CONF}" | cut -d ' ' -f 3 | nl -s ') '
+    until [[ ${CLIENT_NUMBER} -ge 1 && ${CLIENT_NUMBER} -le ${NUMBER_OF_CLIENTS} ]]; do
+        if [[ ${CLIENT_NUMBER} == '1' ]]; then
+            read -rp "Select one client [1]: " CLIENT_NUMBER
+        else
+            read -rp "Select one client [1-${NUMBER_OF_CLIENTS}]: " CLIENT_NUMBER
+        fi
+    done
+
+    # match the selected number to a client name
+    CLIENT_NAME=$(grep -E "^### Client" "${SERVER_AWG_CONF}" | cut -d ' ' -f 3 | sed -n "${CLIENT_NUMBER}"p)
+
+    # Get the home directory for the client
+    HOME_DIR=$(getHomeDirForClient "${CLIENT_NAME}")
+
+    # Check if the client config file exists
+    if [[ -f "${HOME_DIR}/${SERVER_AWG_NIC}-client-${CLIENT_NAME}.conf" ]]; then
+        echo -e "${GREEN}\nHere is your client config file as a QR Code:\n${NC}"
+        qrencode -t ansiutf8 -l L <"${HOME_DIR}/${SERVER_AWG_NIC}-client-${CLIENT_NAME}.conf"
+        echo ""
+    else
+        echo -e "${RED}Client config file not found!${NC}"
+    fi
+}
+
 function uninstallAmneziaWG() {
 	echo ""
 	echo -e "\n${RED}WARNING: This will uninstall AmneziaWG and remove all the configuration files!${NC}"
@@ -623,10 +658,11 @@ function manageMenu() {
 	echo "   1) Add a new user"
 	echo "   2) List all users"
 	echo "   3) Revoke existing user"
-	echo "   4) Uninstall AmneziaWG"
-	echo "   5) Exit"
-	until [[ ${MENU_OPTION} =~ ^[1-5]$ ]]; do
-		read -rp "Select an option [1-5]: " MENU_OPTION
+	echo "   4) Show client QR code"
+	echo "   5) Uninstall AmneziaWG"
+	echo "   6) Exit"
+	until [[ ${MENU_OPTION} =~ ^[1-6]$ ]]; do
+		read -rp "Select an option [1-6]: " MENU_OPTION
 	done
 	case "${MENU_OPTION}" in
 	1)
@@ -639,9 +675,12 @@ function manageMenu() {
 		revokeClient
 		;;
 	4)
-		uninstallAmneziaWG
+        showClientQR
 		;;
 	5)
+		uninstallAmneziaWG
+		;;
+	6)
 		exit 0
 		;;
 	esac
