@@ -92,6 +92,15 @@ function getHomeDirForClient() {
 	echo "$HOME_DIR"
 }
 
+function getDirForClientConfig() {
+	if [[ ${STORE_CLIENT} == 'y' ]]; then
+		CONFIG_DIR=${AMNEZIAWG_DIR}
+	else
+		CONFIG_DIR=$(getHomeDirForClient $1)
+	fi
+	echo "$CONFIG_DIR"
+}
+
 function initialCheck() {
 	isRoot
 	checkVirt
@@ -199,6 +208,11 @@ function installQuestions() {
 		if [[ ${CLIENT_DNS_2} == "" ]]; then
 			CLIENT_DNS_2="${CLIENT_DNS_1}"
 		fi
+	done
+
+	until [[ ${STORE_CLIENT} =~ ^[yn]$ ]]; do
+		read -rp "Store client config file at ${AMNEZIAWG_DIR}? [y/n]: " -e -i n STORE_CLIENT
+		STORE_CLIENT=${STORE_CLIENT,,}
 	done
 
 	until [[ ${ALLOWED_IPS} =~ ^.+$ ]]; do
@@ -314,6 +328,7 @@ SERVER_PRIV_KEY=${SERVER_PRIV_KEY}
 SERVER_PUB_KEY=${SERVER_PUB_KEY}
 CLIENT_DNS_1=${CLIENT_DNS_1}
 CLIENT_DNS_2=${CLIENT_DNS_2}
+STORE_CLIENT=${STORE_CLIENT}
 ALLOWED_IPS=${ALLOWED_IPS}
 KEEPALIVE=${KEEPALIVE}
 SERVER_AWG_JC=${SERVER_AWG_JC}
@@ -462,7 +477,8 @@ function newClient() {
 	CLIENT_PUB_KEY=$(echo "${CLIENT_PRIV_KEY}" | awg pubkey)
 	CLIENT_PRE_SHARED_KEY=$(awg genpsk)
 
-	HOME_DIR=$(getHomeDirForClient "${CLIENT_NAME}")
+	CONFIG_DIR=$(getDirForClientConfig "${CLIENT_NAME}")
+	CLIENT_CONFIG="${CONFIG_DIR}/${SERVER_AWG_NIC}-client-${CLIENT_NAME}.conf"
 
 	# Create client file and add the server as a peer
 	echo "[Interface]
@@ -483,10 +499,10 @@ H4 = ${SERVER_AWG_H4}
 PublicKey = ${SERVER_PUB_KEY}
 PresharedKey = ${CLIENT_PRE_SHARED_KEY}
 Endpoint = ${ENDPOINT}
-AllowedIPs = ${ALLOWED_IPS}" >"${HOME_DIR}/${SERVER_AWG_NIC}-client-${CLIENT_NAME}.conf"
+AllowedIPs = ${ALLOWED_IPS}" >"${CLIENT_CONFIG}"
 
 	if [[ ${KEEPALIVE} -ne 0 ]]; then
-		echo "PersistentKeepalive = ${KEEPALIVE}" >>"${HOME_DIR}/${SERVER_AWG_NIC}-client-${CLIENT_NAME}.conf"
+		echo "PersistentKeepalive = ${KEEPALIVE}" >>"${CLIENT_CONFIG}"
 	fi
 
 	# Add the client as a peer to the server
@@ -501,11 +517,11 @@ AllowedIPs = ${CLIENT_AWG_IPV4}/32,${CLIENT_AWG_IPV6}/128" >>"${SERVER_AWG_CONF}
 	# Generate QR code if qrencode is installed
 	if command -v qrencode &>/dev/null; then
 		echo -e "${GREEN}\nHere is your client config file as a QR Code:\n${NC}"
-		qrencode -t ansiutf8 -l L <"${HOME_DIR}/${SERVER_AWG_NIC}-client-${CLIENT_NAME}.conf"
+		qrencode -t ansiutf8 -l L <"${CLIENT_CONFIG}"
 		echo ""
 	fi
 
-	echo -e "${GREEN}Your client config file is in ${HOME_DIR}/${SERVER_AWG_NIC}-client-${CLIENT_NAME}.conf${NC}"
+	echo -e "${GREEN}Your client config file is in ${CLIENT_CONFIG}${NC}"
 }
 
 function listClients() {
@@ -545,8 +561,9 @@ function revokeClient() {
 	sed -i "/^### Client ${CLIENT_NAME}\$/,/^$/d" "${SERVER_AWG_CONF}"
 
 	# remove generated client file
-	HOME_DIR=$(getHomeDirForClient "${CLIENT_NAME}")
-	rm -f "${HOME_DIR}/${SERVER_AWG_NIC}-client-${CLIENT_NAME}.conf"
+	CONFIG_DIR=$(getDirForClientConfig "${CLIENT_NAME}")
+	CLIENT_CONFIG="${CONFIG_DIR}/${SERVER_AWG_NIC}-client-${CLIENT_NAME}.conf"
+	rm -f "${CLIENT_CONFIG}"
 
 	# restart AmneziaWG to apply changes
 	awg syncconf "${SERVER_AWG_NIC}" <(awg-quick strip "${SERVER_AWG_NIC}")
@@ -575,12 +592,13 @@ function showClientQR() {
     CLIENT_NAME=$(grep -E "^### Client" "${SERVER_AWG_CONF}" | cut -d ' ' -f 3 | sed -n "${CLIENT_NUMBER}"p)
 
     # Get the home directory for the client
-    HOME_DIR=$(getHomeDirForClient "${CLIENT_NAME}")
+	CONFIG_DIR=$(getDirForClientConfig "${CLIENT_NAME}")
+	CLIENT_CONFIG="${CONFIG_DIR}/${SERVER_AWG_NIC}-client-${CLIENT_NAME}.conf"
 
     # Check if the client config file exists
-    if [[ -f "${HOME_DIR}/${SERVER_AWG_NIC}-client-${CLIENT_NAME}.conf" ]]; then
+    if [[ -f "${CLIENT_CONFIG}" ]]; then
         echo -e "${GREEN}\nHere is your client config file as a QR Code:\n${NC}"
-        qrencode -t ansiutf8 -l L <"${HOME_DIR}/${SERVER_AWG_NIC}-client-${CLIENT_NAME}.conf"
+        qrencode -t ansiutf8 -l L <"${CLIENT_CONFIG}"
         echo ""
     else
         echo -e "${RED}Client config file not found!${NC}"
