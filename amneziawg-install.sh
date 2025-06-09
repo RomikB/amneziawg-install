@@ -215,6 +215,11 @@ function installQuestions() {
 		STORE_CLIENT=${STORE_CLIENT,,}
 	done
 
+	until [[ ${USE_NFTABLES} =~ ^[yn]$ ]]; do
+		read -rp "Use nftables instead of iptables? [y/n]: " -e -i n USE_NFTABLES
+		USE_NFTABLES=${USE_NFTABLES,,}
+	done
+
 	until [[ ${ALLOWED_IPS} =~ ^.+$ ]]; do
 		echo -e "\nAmneziaWG uses a parameter called AllowedIPs to determine what is routed over the VPN."
 		read -rp "Allowed IPs list for generated clients (leave default to route everything): " -e -i '0.0.0.0/0,::/0' ALLOWED_IPS
@@ -273,6 +278,8 @@ function installAmneziaWG() {
 	# Run setup questions first
 	installQuestions
 
+	if [[ ${USE_NFTABLES} == 'y' ]]; then NF_PACKAGE="nftables"; else NF_PACKAGE="iptables"; fi
+
 	# Install AmneziaWG tools and module
 	if [[ ${OS} == 'ubuntu' ]]; then
 		if [[ -e /etc/apt/sources.list.d/ubuntu.sources ]]; then
@@ -288,7 +295,7 @@ function installAmneziaWG() {
 		fi
 		apt install -y software-properties-common
 		add-apt-repository -y ppa:amnezia/ppa
-		apt install -y amneziawg amneziawg-tools qrencode iptables
+		apt install -y amneziawg amneziawg-tools qrencode ${NF_PACKAGE}
 	elif [[ ${OS} == 'debian' ]]; then
 		if ! grep -q "^deb-src" /etc/apt/sources.list; then
 			cp /etc/apt/sources.list /etc/apt/sources.list.d/amneziawg.sources.list
@@ -299,17 +306,17 @@ function installAmneziaWG() {
 		echo "deb https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu focal main" >>/etc/apt/sources.list.d/amneziawg.sources.list
 		echo "deb-src https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu focal main" >>/etc/apt/sources.list.d/amneziawg.sources.list
 		apt update
-		apt install -y amneziawg amneziawg-tools qrencode iptables
+		apt install -y amneziawg amneziawg-tools qrencode ${NF_PACKAGE}
 	elif [[ ${OS} == 'fedora' ]]; then
 		dnf config-manager --set-enabled crb
 		dnf install -y epel-release
 		dnf copr enable -y amneziavpn/amneziawg
-		dnf install -y amneziawg-dkms amneziawg-tools qrencode iptables
+		dnf install -y amneziawg-dkms amneziawg-tools qrencode ${NF_PACKAGE}
 	elif [[ ${OS} == 'centos' ]] || [[ ${OS} == 'almalinux' ]] || [[ ${OS} == 'rocky' ]]; then
 		dnf config-manager --set-enabled crb
 		dnf install -y epel-release
 		dnf copr enable -y amneziavpn/amneziawg
-		dnf install -y amneziawg-dkms amneziawg-tools qrencode iptables
+		dnf install -y amneziawg-dkms amneziawg-tools qrencode ${NF_PACKAGE}
 	fi
 
 	SERVER_AWG_CONF="${AMNEZIAWG_DIR}/${SERVER_AWG_NIC}.conf"
@@ -329,6 +336,7 @@ SERVER_PUB_KEY=${SERVER_PUB_KEY}
 CLIENT_DNS_1=${CLIENT_DNS_1}
 CLIENT_DNS_2=${CLIENT_DNS_2}
 STORE_CLIENT=${STORE_CLIENT}
+USE_NFTABLES=${USE_NFTABLES}
 ALLOWED_IPS=${ALLOWED_IPS}
 KEEPALIVE=${KEEPALIVE}
 SERVER_AWG_JC=${SERVER_AWG_JC}
@@ -361,6 +369,16 @@ H4 = ${SERVER_AWG_H4}" >"${SERVER_AWG_CONF}"
 		FIREWALLD_IPV6_ADDRESS=$(echo "${SERVER_AWG_IPV6}" | sed 's/:[^:]*$/:0/')
 		echo "PostUp = firewall-cmd --add-port ${SERVER_PORT}/udp && firewall-cmd --add-rich-rule='rule family=ipv4 source address=${FIREWALLD_IPV4_ADDRESS}/24 masquerade' && firewall-cmd --add-rich-rule='rule family=ipv6 source address=${FIREWALLD_IPV6_ADDRESS}/24 masquerade'
 PostDown = firewall-cmd --remove-port ${SERVER_PORT}/udp && firewall-cmd --remove-rich-rule='rule family=ipv4 source address=${FIREWALLD_IPV4_ADDRESS}/24 masquerade' && firewall-cmd --remove-rich-rule='rule family=ipv6 source address=${FIREWALLD_IPV6_ADDRESS}/24 masquerade'" >>"${SERVER_AWG_CONF}"
+	elif [[ $USE_NFTABLES == 'y' ]]; then
+		echo "PostUp = nft add table inet amneziawg
+PostUp = nft add chain inet amneziawg input { type filter hook input priority 0 \; }
+PostUp = nft add rule inet amneziawg input udp dport ${SERVER_PORT} accept
+PostUp = nft add chain inet amneziawg forward { type filter hook forward priority 0 \; }
+PostUp = nft add rule inet amneziawg forward iifname \"${SERVER_PUB_NIC}\" oifname \"${SERVER_AWG_NIC}\" accept
+PostUp = nft add rule inet amneziawg forward iifname \"${SERVER_AWG_NIC}\" accept
+PostUp = nft add chain inet amneziawg postrouting { type nat hook postrouting priority 100 \; }
+PostUp = nft add rule inet amneziawg postrouting oifname \"${SERVER_PUB_NIC}\" masquerade
+PostDown = nft delete table inet amneziawg" >>"${SERVER_AWG_CONF}"
 	else
 		echo "PostUp = iptables -I INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT
 PostUp = iptables -I FORWARD -i ${SERVER_PUB_NIC} -o ${SERVER_AWG_NIC} -j ACCEPT
@@ -624,6 +642,8 @@ function uninstallAmneziaWG() {
 		# Remove config files
 		rm -rf ${AMNEZIAWG_DIR}/*
 
+		if [[ ${USE_NFTABLES} == 'y' ]]; then NF_PACKAGE="nftables"; else NF_PACKAGE="iptables"; fi
+
 		if [[ ${OS} == 'ubuntu' ]]; then
 			apt remove -y amneziawg amneziawg-tools
 			add-apt-repository -ry ppa:amnezia/ppa
@@ -654,6 +674,7 @@ function uninstallAmneziaWG() {
 			exit 1
 		else
 			echo "AmneziaWG uninstalled successfully."
+			echo "You can remove the qrencode and ${NF_PACKAGE} packages yourself if you don't need them."
 			exit 0
 		fi
 	else
