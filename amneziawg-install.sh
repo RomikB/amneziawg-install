@@ -35,33 +35,42 @@ function checkVirt() {
 
 function checkOS() {
 	source /etc/os-release
+
 	OS="${ID}"
-	if [[ ${OS} == "debian" || ${OS} == "raspbian" ]]; then
-		if [[ ${VERSION_ID} -lt 11 ]]; then
-			echo "Your version of Debian (${VERSION_ID}) is not supported. Please use Debian 11 Bullseye or later"
+
+	case "$OS" in
+	"debian" | "raspbian")
+		if [[ "$VERSION_ID" -lt 11 ]]; then
+			echo "Your version of Debian ($VERSION_ID) is not supported. Please use Debian 11 Bullseye or later."
+			exit 1
+    	fi
+		OS="debian" #overwrite if raspbian
+		;;
+	"ubuntu")
+		MAJOR_VERSION=$(echo "$VERSION_ID" | cut -d'.' -f1)
+		if [[ "$MAJOR_VERSION" -lt 22 ]]; then
+			echo "Your version of Ubuntu ($VERSION_ID) is not supported. Please use Ubuntu 22.04 or later."
 			exit 1
 		fi
-		OS=debian # overwrite if raspbian
-	elif [[ ${OS} == "ubuntu" ]]; then
-		RELEASE_YEAR=$(echo "${VERSION_ID}" | cut -d'.' -f1)
-		if [[ ${RELEASE_YEAR} -lt 22 ]]; then
-			echo "Your version of Ubuntu (${VERSION_ID}) is not supported. Please use Ubuntu 22.04 or later"
+		;;
+	"fedora")
+		if [[ "$VERSION_ID" -lt 39 ]]; then
+			echo "Your version of Fedora ($VERSION_ID) is not supported. Please use Fedora 39 or later."
 			exit 1
 		fi
-	elif [[ ${OS} == "fedora" ]]; then
-		if [[ ${VERSION_ID} -lt 39 ]]; then
-			echo "Your version of Fedora (${VERSION_ID}) is not supported. Please use Fedora 39 or later"
+		;;
+	"centos" | "almalinux" | "rocky")
+        MAJOR_VERSION=$(echo "$VERSION_ID" | cut -d'.' -f1)
+		if [[ "$MAJOR_VERSION" -lt 9 ]]; then
+			echo "Your version of $OS ($VERSION_ID) is not supported. Please use $OS 9 or later."
 			exit 1
 		fi
-	elif [[ ${OS} == 'centos' ]] || [[ ${OS} == 'almalinux' ]] || [[ ${OS} == 'rocky' ]]; then
-		if [[ ${VERSION_ID} == 7* ]] || [[ ${VERSION_ID} == 8* ]]; then
-			echo "Your version of CentOS (${VERSION_ID}) is not supported. Please use CentOS 9 or later"
-			exit 1
-		fi
-	else
-		echo "Looks like you aren't running this installer on a Debian, Ubuntu, Fedora, CentOS, AlmaLinux or Rocky Linux system"
+		;;
+	*)
+		echo "Looks like you are not running this installer on a Debian, Ubuntu, Fedora, CentOS, AlmaLinux or Rocky Linux system."
 		exit 1
-	fi
+		;;
+	esac
 }
 
 function getHomeDirForClient() {
