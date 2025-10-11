@@ -306,23 +306,21 @@ function installAmneziaWG() {
 		add-apt-repository -y ppa:amnezia/ppa
 		apt install -y amneziawg amneziawg-tools qrencode ${NF_PACKAGE}
 	elif [[ ${OS} == 'debian' ]]; then
-		apt-get install -y gnupg2 linux-headers-$(uname -r)
+		if ! command -v gpg &> /dev/null; then apt install -y gnupg; fi
+		# apt-get install -y gnupg2 linux-headers-$(uname -r)
 		if [[ -f "/etc/apt/sources.list.d/debian.sources" ]]; then
-			apt-get install -y curl ca-certificates
-
-			curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x57290828" | gpg --dearmor -o "/usr/share/keyrings/amnezia-archive-keyring.gpg"
-
+			# apt-get install -y curl ca-certificates
+			curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x57290828" | gpg --dearmor -o "/etc/apt/keyrings/amneziawg-keyring.gpg"
 			echo "Types: deb deb-src
 URIs: https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu
 Suites: focal
 Components: main
-Signed-By: /usr/share/keyrings/amnezia-archive-keyring.gpg
+Signed-By: /etc/apt/keyrings/amneziawg-keyring.gpg
 " > "/etc/apt/sources.list.d/amneziawg.sources"
 		else
 			if ! grep -q "^deb-src" /etc/apt/sources.list; then
 				sed 's/^deb/deb-src/' /etc/apt/sources.list > /etc/apt/sources.list.d/amneziawg.sources.list
 			fi
-
 			apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 57290828
 			echo "deb https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu focal main" >> /etc/apt/sources.list.d/amneziawg.sources.list
 			echo "deb-src https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu focal main" >> /etc/apt/sources.list.d/amneziawg.sources.list
