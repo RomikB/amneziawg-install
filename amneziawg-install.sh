@@ -306,10 +306,9 @@ function installAmneziaWG() {
 		add-apt-repository -y ppa:amnezia/ppa
 		apt install -y amneziawg amneziawg-tools qrencode ${NF_PACKAGE}
 	elif [[ ${OS} == 'debian' ]]; then
+		apt-get install -y linux-headers-$(uname -r)
 		if ! command -v gpg &> /dev/null; then apt install -y gnupg; fi
-		# apt-get install -y gnupg2 linux-headers-$(uname -r)
 		if [[ -f "/etc/apt/sources.list.d/debian.sources" ]]; then
-			# apt-get install -y curl ca-certificates
 			curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x57290828" | gpg --dearmor -o "/etc/apt/keyrings/amneziawg-keyring.gpg"
 			echo "Types: deb deb-src
 URIs: https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu
