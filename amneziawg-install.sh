@@ -306,6 +306,7 @@ function installAmneziaWG() {
 		add-apt-repository -y ppa:amnezia/ppa
 		apt install -y amneziawg amneziawg-tools qrencode ${NF_PACKAGE}
 	elif [[ ${OS} == 'debian' ]]; then
+		apt-get update
 		apt-get install -y linux-headers-$(uname -r)
 		if ! command -v gpg &> /dev/null; then apt install -y gnupg; fi
 		if [[ -f "/etc/apt/sources.list.d/debian.sources" ]]; then
