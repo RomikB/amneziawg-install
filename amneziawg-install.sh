@@ -238,7 +238,7 @@ function installQuestions() {
 
 	POSSIBLE_ALLOWED_IPS="0.0.0.0/0"
 	if [[ ${USE_IPV6} == 'y' ]]; then
-		POSSIBLE_ALLOWED_IPS="${POSSIBLE_ALLOWED_IPS},::/0"
+		POSSIBLE_ALLOWED_IPS="${POSSIBLE_ALLOWED_IPS}, ::/0"
 	fi
 	until [[ ${ALLOWED_IPS} =~ ^.+$ ]]; do
 		echo -e "\nAmneziaWG uses a parameter called AllowedIPs to determine what is routed over the VPN."
@@ -359,13 +359,7 @@ Signed-By: /etc/apt/keyrings/amneziawg-keyring.gpg
 	echo "SERVER_PUB_IP=${SERVER_PUB_IP}
 SERVER_PUB_NIC=${SERVER_PUB_NIC}
 SERVER_AWG_NIC=${SERVER_AWG_NIC}
-SERVER_AWG_IPV4=${SERVER_AWG_IPV4}" > "${AMNEZIAWG_DIR}/params"
-
-	if [[ ${USE_IPV6} == 'y' ]]; then
-		echo "SERVER_AWG_IPV6=${SERVER_AWG_IPV6}" >> "${AMNEZIAWG_DIR}/params"
-	fi
-
-	echo "SERVER_PORT=${SERVER_PORT}
+SERVER_PORT=${SERVER_PORT}
 SERVER_PRIV_KEY=${SERVER_PRIV_KEY}
 SERVER_PUB_KEY=${SERVER_PUB_KEY}
 CLIENT_DNS_1=${CLIENT_DNS_1}
@@ -383,19 +377,15 @@ SERVER_AWG_S2=${SERVER_AWG_S2}
 SERVER_AWG_H1=${SERVER_AWG_H1}
 SERVER_AWG_H2=${SERVER_AWG_H2}
 SERVER_AWG_H3=${SERVER_AWG_H3}
-SERVER_AWG_H4=${SERVER_AWG_H4}" >> "${AMNEZIAWG_DIR}/params"
+SERVER_AWG_H4=${SERVER_AWG_H4}
+SERVER_AWG_IPV4=${SERVER_AWG_IPV4}" >"${AMNEZIAWG_DIR}/params"
+	echo "SERVER_AWG_IPV6=${SERVER_AWG_IPV6}" >>"${AMNEZIAWG_DIR}/params"
 
 	# Add server interface
-	printf "[Interface]
-Address = ${SERVER_AWG_IPV4}/24" > "${SERVER_AWG_CONF}"
-
-	if [[ ${USE_IPV6} == 'y' ]]; then
-		echo ",${SERVER_AWG_IPV6}/64" >> "${SERVER_AWG_CONF}"
-	else
-		echo "" >> "${SERVER_AWG_CONF}"
-	fi
-
-	echo "ListenPort = ${SERVER_PORT}
+	SERVER_ADDRESS_VALUE="${SERVER_AWG_IPV4}/24, ${SERVER_AWG_IPV6}/64"
+	echo "[Interface]
+Address = ${SERVER_ADDRESS_VALUE}
+ListenPort = ${SERVER_PORT}
 PrivateKey = ${SERVER_PRIV_KEY}
 Jc = ${SERVER_AWG_JC}
 Jmin = ${SERVER_AWG_JMIN}
@@ -440,22 +430,16 @@ PostDown = nft delete table inet amneziawg" >>"${SERVER_AWG_CONF}"
 		echo "PostUp = iptables -I INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT
 PostUp = iptables -I FORWARD -i ${SERVER_PUB_NIC} -o ${SERVER_AWG_NIC} -j ACCEPT
 PostUp = iptables -I FORWARD -i ${SERVER_AWG_NIC} -j ACCEPT
-PostUp = iptables -t nat -A POSTROUTING -o ${SERVER_PUB_NIC} -j MASQUERADE" >> "${SERVER_AWG_CONF}"
-
-		if [[ ${USE_IPV6} == 'y' ]]; then
-			echo "PostUp = ip6tables -I INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT
-PostUp = ip6tables -I FORWARD -i ${SERVER_PUB_NIC} -o ${SERVER_AWG_NIC} -j ACCEPT
-PostUp = ip6tables -I FORWARD -i ${SERVER_AWG_NIC} -j ACCEPT
-PostUp = ip6tables -t nat -A POSTROUTING -o ${SERVER_PUB_NIC} -j MASQUERADE" >> "${SERVER_AWG_CONF}"
-		fi
-
-		echo "PostDown = iptables -D INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT
+PostUp = iptables -t nat -A POSTROUTING -o ${SERVER_PUB_NIC} -j MASQUERADE
+PostDown = iptables -D INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT
 PostDown = iptables -D FORWARD -i ${SERVER_PUB_NIC} -o ${SERVER_AWG_NIC} -j ACCEPT
 PostDown = iptables -D FORWARD -i ${SERVER_AWG_NIC} -j ACCEPT
-PostDown = iptables -t nat -D POSTROUTING -o ${SERVER_PUB_NIC} -j MASQUERADE" >> "${SERVER_AWG_CONF}"
-
-		if [[ ${USE_IPV6} == 'y' ]]; then
-			echo "PostDown = ip6tables -D INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT
+PostDown = iptables -t nat -D POSTROUTING -o ${SERVER_PUB_NIC} -j MASQUERADE" >>"${SERVER_AWG_CONF}"
+		echo "PostUp = ip6tables -I INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT
+PostUp = ip6tables -I FORWARD -i ${SERVER_PUB_NIC} -o ${SERVER_AWG_NIC} -j ACCEPT
+PostUp = ip6tables -I FORWARD -i ${SERVER_AWG_NIC} -j ACCEPT
+PostUp = ip6tables -t nat -A POSTROUTING -o ${SERVER_PUB_NIC} -j MASQUERADE
+PostDown = ip6tables -D INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT
 PostDown = ip6tables -D FORWARD -i ${SERVER_PUB_NIC} -o ${SERVER_AWG_NIC} -j ACCEPT
 PostDown = ip6tables -D FORWARD -i ${SERVER_AWG_NIC} -j ACCEPT
 PostDown = ip6tables -t nat -D POSTROUTING -o ${SERVER_PUB_NIC} -j MASQUERADE" >> "${SERVER_AWG_CONF}"
@@ -463,11 +447,8 @@ PostDown = ip6tables -t nat -D POSTROUTING -o ${SERVER_PUB_NIC} -j MASQUERADE" >
 	fi
 
 	# Enable routing on the server
-	echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/awg.conf
-
-	if [[ ${USE_IPV6} == 'y' ]]; then
-		echo "net.ipv6.conf.all.forwarding = 1" >> /etc/sysctl.d/awg.conf
-	fi
+	echo "net.ipv4.ip_forward = 1" >/etc/sysctl.d/awg.conf
+	echo "net.ipv6.conf.all.forwarding = 1" >>/etc/sysctl.d/awg.conf
 
 	sysctl --system
 
@@ -568,17 +549,12 @@ function newClient() {
 	CLIENT_CONFIG="${CONFIG_DIR}/${SERVER_AWG_NIC}-client-${CLIENT_NAME}.conf"
 
 	# Create client file and add the server as a peer
-	printf "[Interface]
+	CLIENT_ADDRESS_VALUE="${CLIENT_AWG_IPV4}/32, ${CLIENT_AWG_IPV6}/128"
+	CLIENT_DNS_VALUE="${CLIENT_DNS_1}, ${CLIENT_DNS_2}"
+	echo "[Interface]
 PrivateKey = ${CLIENT_PRIV_KEY}
-Address = ${CLIENT_AWG_IPV4}/32" > "${CLIENT_CONFIG}"
-
-	if [[ ${USE_IPV6} == 'y' ]]; then
-		echo ",${CLIENT_AWG_IPV6}/128" >> "${CLIENT_CONFIG}"
-	else
-		echo "" >> "${CLIENT_CONFIG}"
-	fi
-
-	echo "DNS = ${CLIENT_DNS_1},${CLIENT_DNS_2}
+Address = ${CLIENT_ADDRESS_VALUE}
+DNS = ${CLIENT_DNS_VALUE}
 Jc = ${SERVER_AWG_JC}
 Jmin = ${SERVER_AWG_JMIN}
 Jmax = ${SERVER_AWG_JMAX}
@@ -604,13 +580,7 @@ AllowedIPs = ${ALLOWED_IPS}" >> "${CLIENT_CONFIG}"
 [Peer]
 PublicKey = ${CLIENT_PUB_KEY}
 PresharedKey = ${CLIENT_PRE_SHARED_KEY}
-AllowedIPs = ${CLIENT_AWG_IPV4}/32" >> "${SERVER_AWG_CONF}"
-
-	if [[ ${USE_IPV6} == 'y' ]]; then
-		echo ",${CLIENT_AWG_IPV6}/128" >> "${SERVER_AWG_CONF}"
-	else
-		echo "" >> "${SERVER_AWG_CONF}"
-	fi
+AllowedIPs = ${CLIENT_ADDRESS_VALUE}" >>"${SERVER_AWG_CONF}"
 
 	awg syncconf "${SERVER_AWG_NIC}" <(awg-quick strip "${SERVER_AWG_NIC}")
 
