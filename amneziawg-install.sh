@@ -176,11 +176,19 @@ function installQuestions() {
     echo "You can keep the default options and just press enter if you are ok with them."
     echo ""
 
+    until [[ ${USE_IPV6} =~ ^[yn]$ ]]; do
+        read -rp "Do you want to use IPv6? [y/n]: " -e -i n USE_IPV6
+        USE_IPV6=${USE_IPV6,,}
+    done
+
     # Detect public IPv4 or IPv6 address and pre-fill for the user
     SERVER_PUB_IP=$(ip -4 addr | sed -ne 's|^.* inet \([^/]*\)/.* scope global.*$|\1|p' | awk '{print $1}' | head -1)
-    if [[ -z ${SERVER_PUB_IP} ]]; then
-        # Detect public IPv6 address
-        SERVER_PUB_IP=$(ip -6 addr | sed -ne 's|^.* inet6 \([^/]*\)/.* scope global.*$|\1|p' | head -1)
+
+    if [[ "$USE_IPV6" = 'y' ]]; then
+        if [[ -z ${SERVER_PUB_IP} ]]; then
+            # Detect public IPv6 address
+            SERVER_PUB_IP=$(ip -6 addr | sed -ne 's|^.* inet6 \([^/]*\)/.* scope global.*$|\1|p' | head -1)
+        fi
     fi
     read -rp "Public IPv4 or IPv6 address or domain: " -e -i "${SERVER_PUB_IP}" SERVER_PUB_IP
 
@@ -198,9 +206,11 @@ function installQuestions() {
         read -rp "Server AmneziaWG IPv4: " -e -i 10.66.66.1 SERVER_AWG_IPV4
     done
 
-    until [[ ${SERVER_AWG_IPV6} =~ ^([a-f0-9]{1,4}:){3,4}: ]]; do
-        read -rp "Server AmneziaWG IPv6: " -e -i fd42:42:42::1 SERVER_AWG_IPV6
-    done
+    if [[ ${USE_IPV6} == 'y' ]]; then
+        until [[ ${SERVER_AWG_IPV6} =~ ^([a-f0-9]{1,4}:){3,4}: ]]; do
+            read -rp "Server AmneziaWG IPv6: " -e -i fd42:42:42::1 SERVER_AWG_IPV6
+        done
+    fi
 
     # Generate random number within private ports range
     RANDOM_PORT=$(shuf -i49152-65535 -n1)
@@ -212,6 +222,7 @@ function installQuestions() {
     until [[ ${CLIENT_DNS_1} =~ ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$ ]]; do
         read -rp "First DNS resolver to use for the clients: " -e -i 1.1.1.1 CLIENT_DNS_1
     done
+    
     until [[ ${CLIENT_DNS_2} =~ ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$ ]]; do
         read -rp "Second DNS resolver to use for the clients (optional): " -e -i 1.0.0.1 CLIENT_DNS_2
         if [[ ${CLIENT_DNS_2} == "" ]]; then
@@ -229,11 +240,15 @@ function installQuestions() {
         USE_NFTABLES=${USE_NFTABLES,,}
     done
 
+    POSSIBLE_ALLOWED_IPS="0.0.0.0/0"
+    if [[ ${USE_IPV6} == 'y' ]]; then
+        POSSIBLE_ALLOWED_IPS="${POSSIBLE_ALLOWED_IPS}, ::/0"
+    fi
     until [[ ${ALLOWED_IPS} =~ ^.+$ ]]; do
         echo -e "\nAmneziaWG uses a parameter called AllowedIPs to determine what is routed over the VPN."
-        read -rp "Allowed IPs list for generated clients (leave default to route everything): " -e -i '0.0.0.0/0, ::/0' ALLOWED_IPS
+        read -rp "Allowed IPs list for generated clients (leave default to route everything): " -e -i "$POSSIBLE_ALLOWED_IPS" ALLOWED_IPS
         if [[ ${ALLOWED_IPS} == "" ]]; then
-            ALLOWED_IPS="0.0.0.0/0, ::/0"
+            ALLOWED_IPS="$POSSIBLE_ALLOWED_IPS"
         fi
     done
 
@@ -344,8 +359,15 @@ Signed-By: /etc/apt/keyrings/amneziawg-keyring.gpg
     SERVER_PRIV_KEY=$(awg genkey)
     SERVER_PUB_KEY=$(echo "${SERVER_PRIV_KEY}" | awg pubkey)
 
-    # Save WireGuard settings
-    echo "SERVER_PUB_IP=${SERVER_PUB_IP}
+    SERVER_AWG_IPS="SERVER_AWG_IPV4=${SERVER_AWG_IPV4}"
+
+    if [[ "$USE_IPV6" = 'y' ]]; then
+        SERVER_AWG_IPS="${SERVER_AWG_IPS}\nSERVER_AWG_IPV6=${SERVER_AWG_IPV6}"
+    fi
+
+    # Save AmneziaWG settings
+    echo -e "${SERVER_AWG_IPS}
+SERVER_PUB_IP=${SERVER_PUB_IP}
 SERVER_PUB_NIC=${SERVER_PUB_NIC}
 SERVER_AWG_NIC=${SERVER_AWG_NIC}
 SERVER_PORT=${SERVER_PORT}
@@ -354,8 +376,9 @@ SERVER_PUB_KEY=${SERVER_PUB_KEY}
 CLIENT_DNS_1=${CLIENT_DNS_1}
 CLIENT_DNS_2=${CLIENT_DNS_2}
 STORE_CLIENT=${STORE_CLIENT}
+USE_IPV6=${USE_IPV6}
 USE_NFTABLES=${USE_NFTABLES}
-ALLOWED_IPS=${ALLOWED_IPS}
+ALLOWED_IPS=\"${ALLOWED_IPS}\"
 KEEPALIVE=${KEEPALIVE}
 SERVER_AWG_JC=${SERVER_AWG_JC}
 SERVER_AWG_JMIN=${SERVER_AWG_JMIN}
@@ -365,14 +388,17 @@ SERVER_AWG_S2=${SERVER_AWG_S2}
 SERVER_AWG_H1=${SERVER_AWG_H1}
 SERVER_AWG_H2=${SERVER_AWG_H2}
 SERVER_AWG_H3=${SERVER_AWG_H3}
-SERVER_AWG_H4=${SERVER_AWG_H4}
-SERVER_AWG_IPV4=${SERVER_AWG_IPV4}" >"${AMNEZIAWG_DIR}/params"
-    echo "SERVER_AWG_IPV6=${SERVER_AWG_IPV6}" >>"${AMNEZIAWG_DIR}/params"
+SERVER_AWG_H4=${SERVER_AWG_H4}" > "${AMNEZIAWG_DIR}/params"
 
     # Add server interface
-    SERVER_ADDRESS_VALUE="${SERVER_AWG_IPV4}/24, ${SERVER_AWG_IPV6}/64"
+    SERVER_ADDRESS="${SERVER_AWG_IPV4}/24"
+
+    if [[ "$USE_IPV6" = 'y' ]]; then
+        SERVER_ADDRESS="${SERVER_ADDRESS}, ${SERVER_AWG_IPV6}/64"
+    fi
+
     echo "[Interface]
-Address = ${SERVER_ADDRESS_VALUE}
+Address = ${SERVER_ADDRESS}
 ListenPort = ${SERVER_PORT}
 PrivateKey = ${SERVER_PRIV_KEY}
 Jc = ${SERVER_AWG_JC}
@@ -388,9 +414,23 @@ H4 = ${SERVER_AWG_H4}" >"${SERVER_AWG_CONF}"
     if pgrep firewalld; then
         FIREWALLD_IPV4_ADDRESS=$(echo "${SERVER_AWG_IPV4}" | cut -d"." -f1-3)".0"
         FIREWALLD_IPV6_ADDRESS=$(echo "${SERVER_AWG_IPV6}" | sed 's/:[^:]*$/:0/')
-        echo "PostUp = firewall-cmd --add-port ${SERVER_PORT}/udp && firewall-cmd --add-rich-rule='rule family=ipv4 source address=${FIREWALLD_IPV4_ADDRESS}/24 masquerade' && firewall-cmd --add-rich-rule='rule family=ipv6 source address=${FIREWALLD_IPV6_ADDRESS}/24 masquerade'
-PostDown = firewall-cmd --remove-port ${SERVER_PORT}/udp && firewall-cmd --remove-rich-rule='rule family=ipv4 source address=${FIREWALLD_IPV4_ADDRESS}/24 masquerade' && firewall-cmd --remove-rich-rule='rule family=ipv6 source address=${FIREWALLD_IPV6_ADDRESS}/24 masquerade'" >>"${SERVER_AWG_CONF}"
-    elif [[ $USE_NFTABLES == 'y' ]]; then
+
+        printf "PostUp = firewall-cmd --add-port ${SERVER_PORT}/udp && firewall-cmd --add-rich-rule='rule family=ipv4 source address=${FIREWALLD_IPV4_ADDRESS}/24 masquerade'" >> "${SERVER_AWG_CONF}"
+
+        if [[ ${USE_IPV6} == 'y' ]]; then
+            echo " && firewall-cmd --add-rich-rule='rule family=ipv6 source address=${FIREWALLD_IPV6_ADDRESS}/64 masquerade'" >> "${SERVER_AWG_CONF}"
+        else
+            echo "" >> "${SERVER_AWG_CONF}"
+        fi
+
+        printf "PostDown = firewall-cmd --remove-port ${SERVER_PORT}/udp && firewall-cmd --remove-rich-rule='rule family=ipv4 source address=${FIREWALLD_IPV4_ADDRESS}/24 masquerade'" >> "${SERVER_AWG_CONF}"
+
+        if [[ ${USE_IPV6} == 'y' ]]; then
+            echo " && firewall-cmd --remove-rich-rule='rule family=ipv6 source address=${FIREWALLD_IPV6_ADDRESS}/64 masquerade'" >> "${SERVER_AWG_CONF}"
+        else
+            echo "" >> "${SERVER_AWG_CONF}"
+        fi
+    elif [[ ${USE_NFTABLES} == 'y' ]]; then
         echo "PostUp = nft add table inet amneziawg
 PostUp = nft add chain inet amneziawg input { type filter hook input priority 0 \; }
 PostUp = nft add rule inet amneziawg input udp dport ${SERVER_PORT} accept
@@ -408,20 +448,26 @@ PostUp = iptables -t nat -A POSTROUTING -o ${SERVER_PUB_NIC} -j MASQUERADE
 PostDown = iptables -D INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT
 PostDown = iptables -D FORWARD -i ${SERVER_PUB_NIC} -o ${SERVER_AWG_NIC} -j ACCEPT
 PostDown = iptables -D FORWARD -i ${SERVER_AWG_NIC} -j ACCEPT
-PostDown = iptables -t nat -D POSTROUTING -o ${SERVER_PUB_NIC} -j MASQUERADE" >>"${SERVER_AWG_CONF}"
-        echo "PostUp = ip6tables -I INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT
+PostDown = iptables -t nat -D POSTROUTING -o ${SERVER_PUB_NIC} -j MASQUERADE" >> "${SERVER_AWG_CONF}"
+
+        if [[ "$USE_IPV6" = 'y' ]]; then
+            echo "PostUp = ip6tables -I INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT
 PostUp = ip6tables -I FORWARD -i ${SERVER_PUB_NIC} -o ${SERVER_AWG_NIC} -j ACCEPT
 PostUp = ip6tables -I FORWARD -i ${SERVER_AWG_NIC} -j ACCEPT
 PostUp = ip6tables -t nat -A POSTROUTING -o ${SERVER_PUB_NIC} -j MASQUERADE
 PostDown = ip6tables -D INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT
 PostDown = ip6tables -D FORWARD -i ${SERVER_PUB_NIC} -o ${SERVER_AWG_NIC} -j ACCEPT
 PostDown = ip6tables -D FORWARD -i ${SERVER_AWG_NIC} -j ACCEPT
-PostDown = ip6tables -t nat -D POSTROUTING -o ${SERVER_PUB_NIC} -j MASQUERADE" >>"${SERVER_AWG_CONF}"
+PostDown = ip6tables -t nat -D POSTROUTING -o ${SERVER_PUB_NIC} -j MASQUERADE" >> "${SERVER_AWG_CONF}"  
+        fi
     fi
 
     # Enable routing on the server
-    echo "net.ipv4.ip_forward = 1" >/etc/sysctl.d/awg.conf
-    echo "net.ipv6.conf.all.forwarding = 1" >>/etc/sysctl.d/awg.conf
+    echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/awg.conf
+
+    if [[ "$USE_IPV6" = 'y' ]]; then
+        echo "net.ipv6.conf.all.forwarding = 1" >> /etc/sysctl.d/awg.conf
+    fi
 
     sysctl --system
 
@@ -498,18 +544,20 @@ function newClient() {
         fi
     done
 
-    BASE_IP=$(echo "$SERVER_AWG_IPV6" | awk -F '::' '{ print $1 }')
-    until [[ ${IPV6_EXISTS} == '0' ]]; do
-        read -rp "Client AmneziaWG IPv6: ${BASE_IP}::" -e -i "${DOT_IP}" DOT_IP
-        CLIENT_AWG_IPV6="${BASE_IP}::${DOT_IP}"
-        IPV6_EXISTS=$(grep -c "${CLIENT_AWG_IPV6}/128" "${SERVER_AWG_CONF}")
+    if [[ ${USE_IPV6} == 'y' ]]; then
+        BASE_IP=$(echo "$SERVER_AWG_IPV6" | awk -F '::' '{ print $1 }')
+        until [[ ${IPV6_EXISTS} == '0' ]]; do
+            read -rp "Client AmneziaWG IPv6: ${BASE_IP}::" -e -i "${DOT_IP}" DOT_IP
+            CLIENT_AWG_IPV6="${BASE_IP}::${DOT_IP}"
+            IPV6_EXISTS=$(grep -c "${CLIENT_AWG_IPV6}/128" "${SERVER_AWG_CONF}")
 
-        if [[ ${IPV6_EXISTS} != 0 ]]; then
-            echo ""
-            echo -e "${ORANGE}A client with the specified IPv6 was already created, please choose another IPv6.${NC}"
-            echo ""
-        fi
-    done
+            if [[ ${IPV6_EXISTS} != 0 ]]; then
+                echo ""
+                echo -e "${ORANGE}A client with the specified IPv6 was already created, please choose another IPv6.${NC}"
+                echo ""
+            fi
+        done
+    fi
 
     # Generate key pair for the client
     CLIENT_PRIV_KEY=$(awg genkey)
@@ -520,12 +568,18 @@ function newClient() {
     CLIENT_CONFIG="${CONFIG_DIR}/${SERVER_AWG_NIC}-client-${CLIENT_NAME}.conf"
 
     # Create client file and add the server as a peer
-    CLIENT_ADDRESS_VALUE="${CLIENT_AWG_IPV4}/32, ${CLIENT_AWG_IPV6}/128"
-    CLIENT_DNS_VALUE="${CLIENT_DNS_1}, ${CLIENT_DNS_2}"
+    CLIENT_CONFIG_DNS="${CLIENT_DNS_1}, ${CLIENT_DNS_2}"
+
+    CLIENT_ADDRESS="${CLIENT_AWG_IPV4}/32"
+
+    if [[ "$USE_IPV6" = 'y' ]]; then
+        CLIENT_ADDRESS="${CLIENT_ADDRESS}, ${CLIENT_AWG_IPV6}/128"
+    fi
+
     echo "[Interface]
 PrivateKey = ${CLIENT_PRIV_KEY}
-Address = ${CLIENT_ADDRESS_VALUE}
-DNS = ${CLIENT_DNS_VALUE}
+Address = ${CLIENT_ADDRESS}
+DNS = ${CLIENT_CONFIG_DNS}
 Jc = ${SERVER_AWG_JC}
 Jmin = ${SERVER_AWG_JMIN}
 Jmax = ${SERVER_AWG_JMAX}
@@ -540,7 +594,7 @@ H4 = ${SERVER_AWG_H4}
 PublicKey = ${SERVER_PUB_KEY}
 PresharedKey = ${CLIENT_PRE_SHARED_KEY}
 Endpoint = ${ENDPOINT}
-AllowedIPs = ${ALLOWED_IPS}" >"${CLIENT_CONFIG}"
+AllowedIPs = ${ALLOWED_IPS}" > "${CLIENT_CONFIG}"
 
     if [[ ${KEEPALIVE} -ne 0 ]]; then
         echo "PersistentKeepalive = ${KEEPALIVE}" >>"${CLIENT_CONFIG}"
@@ -551,7 +605,7 @@ AllowedIPs = ${ALLOWED_IPS}" >"${CLIENT_CONFIG}"
 [Peer]
 PublicKey = ${CLIENT_PUB_KEY}
 PresharedKey = ${CLIENT_PRE_SHARED_KEY}
-AllowedIPs = ${CLIENT_ADDRESS_VALUE}" >>"${SERVER_AWG_CONF}"
+AllowedIPs = ${CLIENT_ADDRESS}" >> "${SERVER_AWG_CONF}"
 
     awg syncconf "${SERVER_AWG_NIC}" <(awg-quick strip "${SERVER_AWG_NIC}")
 
