@@ -362,7 +362,7 @@ Signed-By: /etc/apt/keyrings/amneziawg-keyring.gpg
     SERVER_AWG_IPS="SERVER_AWG_IPV4=${SERVER_AWG_IPV4}"
 
     if [[ "$USE_IPV6" = 'y' ]]; then
-        AWG_SERVER_IPS="${AWG_SERVER_IPS}\nSERVER_AWG_IPV6=${SERVER_AWG_IPV6}"
+        SERVER_AWG_IPS="${SERVER_AWG_IPS}\nSERVER_AWG_IPV6=${SERVER_AWG_IPV6}"
     fi
 
     # Save AmneziaWG settings
