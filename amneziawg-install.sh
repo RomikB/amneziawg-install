@@ -594,7 +594,7 @@ H4 = ${SERVER_AWG_H4}
 PublicKey = ${SERVER_PUB_KEY}
 PresharedKey = ${CLIENT_PRE_SHARED_KEY}
 Endpoint = ${ENDPOINT}
-AllowedIPs = ${ALLOWED_IPS}" >> "${CLIENT_CONFIG}"
+AllowedIPs = ${ALLOWED_IPS}" > "${CLIENT_CONFIG}"
 
     if [[ ${KEEPALIVE} -ne 0 ]]; then
         echo "PersistentKeepalive = ${KEEPALIVE}" >>"${CLIENT_CONFIG}"
