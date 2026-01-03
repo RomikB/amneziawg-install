@@ -412,24 +412,27 @@ H3 = ${SERVER_AWG_H3}
 H4 = ${SERVER_AWG_H4}" >"${SERVER_AWG_CONF}"
 
     if pgrep firewalld; then
-        FIREWALLD_IPV4_ADDRESS=$(echo "${SERVER_AWG_IPV4}" | cut -d"." -f1-3)".0"
-        FIREWALLD_IPV6_ADDRESS=$(echo "${SERVER_AWG_IPV6}" | sed 's/:[^:]*$/:0/')
+        echo "PostUp = firewall-cmd --zone=public --add-interface=${SERVER_AWG_NIC}
+PostUp = firewall-cmd --zone=public --add-port=${SERVER_PORT}/udp" >>"${SERVER_AWG_CONF}"
 
-        printf "PostUp = firewall-cmd --add-port ${SERVER_PORT}/udp && firewall-cmd --add-rich-rule='rule family=ipv4 source address=${FIREWALLD_IPV4_ADDRESS}/24 masquerade'" >> "${SERVER_AWG_CONF}"
+        echo "PostUp = firewall-cmd --direct --add-rule ipv4 filter FORWARD 0 -i ${SERVER_PUB_NIC} -o ${SERVER_AWG_NIC} -j ACCEPT
+PostUp = firewall-cmd --direct --add-rule ipv4 filter FORWARD 0 -i ${SERVER_AWG_NIC} -o ${SERVER_PUB_NIC} -j ACCEPT
+PostUp = firewall-cmd --direct --add-rule ipv4 nat POSTROUTING 0 -o ${SERVER_PUB_NIC} -j MASQUERADE
+PostDown = firewall-cmd --direct --remove-rule ipv4 nat POSTROUTING 0 -o ${SERVER_PUB_NIC} -j MASQUERADE
+PostDown = firewall-cmd --direct --remove-rule ipv4 filter FORWARD 0 -i ${SERVER_AWG_NIC} -o ${SERVER_PUB_NIC} -j ACCEPT
+PostDown = firewall-cmd --direct --remove-rule ipv4 filter FORWARD 0 -i ${SERVER_PUB_NIC} -o ${SERVER_AWG_NIC} -j ACCEPT" >>"${SERVER_AWG_CONF}"
 
-        if [[ ${USE_IPV6} == 'y' ]]; then
-            echo " && firewall-cmd --add-rich-rule='rule family=ipv6 source address=${FIREWALLD_IPV6_ADDRESS}/64 masquerade'" >> "${SERVER_AWG_CONF}"
-        else
-            echo "" >> "${SERVER_AWG_CONF}"
+        if [[ "$USE_IPV6" = 'y' ]]; then
+            echo "PostUp = firewall-cmd --direct --add-rule ipv6 filter FORWARD 0 -i ${SERVER_PUB_NIC} -o ${SERVER_AWG_NIC} -j ACCEPT
+PostUp = firewall-cmd --direct --add-rule ipv6 filter FORWARD 0 -i ${SERVER_AWG_NIC} -o ${SERVER_PUB_NIC} -j ACCEPT
+PostUp = firewall-cmd --direct --add-rule ipv6 nat POSTROUTING 0 -o ${SERVER_PUB_NIC} -j MASQUERADE
+PostDown = firewall-cmd --direct --remove-rule ipv6 nat POSTROUTING 0 -o ${SERVER_PUB_NIC} -j MASQUERADE
+PostDown = firewall-cmd --direct --remove-rule ipv6 filter FORWARD 0 -i ${SERVER_AWG_NIC} -o ${SERVER_PUB_NIC} -j ACCEPT
+PostDown = firewall-cmd --direct --remove-rule ipv6 filter FORWARD 0 -i ${SERVER_PUB_NIC} -o ${SERVER_AWG_NIC} -j ACCEPT" >>"${SERVER_AWG_CONF}"
         fi
 
-        printf "PostDown = firewall-cmd --remove-port ${SERVER_PORT}/udp && firewall-cmd --remove-rich-rule='rule family=ipv4 source address=${FIREWALLD_IPV4_ADDRESS}/24 masquerade'" >> "${SERVER_AWG_CONF}"
-
-        if [[ ${USE_IPV6} == 'y' ]]; then
-            echo " && firewall-cmd --remove-rich-rule='rule family=ipv6 source address=${FIREWALLD_IPV6_ADDRESS}/64 masquerade'" >> "${SERVER_AWG_CONF}"
-        else
-            echo "" >> "${SERVER_AWG_CONF}"
-        fi
+        echo "PostDown = firewall-cmd --zone=public --remove-port=${SERVER_PORT}/udp
+PostDown = firewall-cmd --zone=public --remove-interface=${SERVER_AWG_NIC}" >>"${SERVER_AWG_CONF}"
     elif [[ ${USE_NFTABLES} == 'y' ]]; then
         echo "PostUp = nft add table inet amneziawg
 PostUp = nft add chain inet amneziawg input { type filter hook input priority 0 \; }
