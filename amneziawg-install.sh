@@ -409,7 +409,7 @@ S2 = ${SERVER_AWG_S2}
 H1 = ${SERVER_AWG_H1}
 H2 = ${SERVER_AWG_H2}
 H3 = ${SERVER_AWG_H3}
-H4 = ${SERVER_AWG_H4}" >> "${SERVER_AWG_CONF}"
+H4 = ${SERVER_AWG_H4}" >"${SERVER_AWG_CONF}"
 
     if pgrep firewalld; then
         FIREWALLD_IPV4_ADDRESS=$(echo "${SERVER_AWG_IPV4}" | cut -d"." -f1-3)".0"
@@ -439,7 +439,7 @@ PostUp = nft add rule inet amneziawg forward iifname \"${SERVER_PUB_NIC}\" oifna
 PostUp = nft add rule inet amneziawg forward iifname \"${SERVER_AWG_NIC}\" accept
 PostUp = nft add chain inet amneziawg postrouting { type nat hook postrouting priority 100 \; }
 PostUp = nft add rule inet amneziawg postrouting oifname \"${SERVER_PUB_NIC}\" masquerade
-PostDown = nft delete table inet amneziawg" >> "${SERVER_AWG_CONF}"
+PostDown = nft delete table inet amneziawg" >>"${SERVER_AWG_CONF}"
     else
         echo "PostUp = iptables -I INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT
 PostUp = iptables -I FORWARD -i ${SERVER_PUB_NIC} -o ${SERVER_AWG_NIC} -j ACCEPT
@@ -601,7 +601,7 @@ AllowedIPs = ${ALLOWED_IPS}" >> "${CLIENT_CONFIG}"
     fi
 
     # Add the client as a peer to the server
-    printf "\n### Client ${CLIENT_NAME}
+    echo -e "\n### Client ${CLIENT_NAME}
 [Peer]
 PublicKey = ${CLIENT_PUB_KEY}
 PresharedKey = ${CLIENT_PRE_SHARED_KEY}
