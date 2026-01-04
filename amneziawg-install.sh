@@ -219,16 +219,29 @@ function installQuestions() {
     done
 
     # Adguard DNS by default
-    until [[ ${CLIENT_DNS_1} =~ ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$ ]]; do
-        read -rp "First DNS resolver to use for the clients: " -e -i 1.1.1.1 CLIENT_DNS_1
+    until [[ ${CLIENT_IPV4_DNS_1} =~ ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$ ]]; do
+        read -rp "First IPv4 DNS resolver to use for the clients: " -e -i 1.1.1.1 CLIENT_IPV4_DNS_1
     done
-    
-    until [[ ${CLIENT_DNS_2} =~ ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$ ]]; do
-        read -rp "Second DNS resolver to use for the clients (optional): " -e -i 1.0.0.1 CLIENT_DNS_2
-        if [[ ${CLIENT_DNS_2} == "" ]]; then
-            CLIENT_DNS_2="${CLIENT_DNS_1}"
+
+    until [[ ${CLIENT_IPV4_DNS_2} =~ ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$ ]]; do
+        read -rp "Second IPv4 DNS resolver to use for the clients (optional): " -e -i 1.0.0.1 CLIENT_IPV4_DNS_2
+        if [[ ${CLIENT_IPV4_DNS_2} == "" ]]; then
+            CLIENT_IPV4_DNS_2="${CLIENT_IPV4_DNS_1}"
         fi
     done
+
+    if [[ ${USE_IPV6} == 'y' ]]; then
+        until [[ ${CLIENT_IPV6_DNS_1} =~ ^([a-f0-9]{1,4}:){3,4}: ]]; do
+            read -rp "First IPv6 DNS resolver to use for the clients: " -e -i 2606:4700:4700::1111 CLIENT_IPV6_DNS_1
+        done
+
+        until [[ ${CLIENT_IPV6_DNS_2} =~ ^([a-f0-9]{1,4}:){3,4}: ]]; do
+            read -rp "Second IPv6 DNS resolver to use for the clients (optional): " -e -i 2606:4700:4700::1001 CLIENT_IPV6_DNS_2
+            if [[ ${CLIENT_IPV6_DNS_2} == "" ]]; then
+                CLIENT_IPV6_DNS_2="${CLIENT_IPV6_DNS_1}"
+            fi
+        done
+    fi
 
     until [[ ${STORE_CLIENT} =~ ^[yn]$ ]]; do
         read -rp "Store client config file at ${AMNEZIAWG_DIR}? [y/n]: " -e -i n STORE_CLIENT
@@ -373,8 +386,10 @@ SERVER_AWG_NIC=${SERVER_AWG_NIC}
 SERVER_PORT=${SERVER_PORT}
 SERVER_PRIV_KEY=${SERVER_PRIV_KEY}
 SERVER_PUB_KEY=${SERVER_PUB_KEY}
-CLIENT_DNS_1=${CLIENT_DNS_1}
-CLIENT_DNS_2=${CLIENT_DNS_2}
+CLIENT_IPV4_DNS_1=${CLIENT_IPV4_DNS_1}
+CLIENT_IPV4_DNS_2=${CLIENT_IPV4_DNS_2}
+CLIENT_IPV6_DNS_1=${CLIENT_IPV6_DNS_1}
+CLIENT_IPV6_DNS_2=${CLIENT_IPV6_DNS_2}
 STORE_CLIENT=${STORE_CLIENT}
 USE_IPV6=${USE_IPV6}
 USE_NFTABLES=${USE_NFTABLES}
@@ -571,10 +586,12 @@ function newClient() {
     CLIENT_CONFIG="${CONFIG_DIR}/${SERVER_AWG_NIC}-client-${CLIENT_NAME}.conf"
 
     # Create client file and add the server as a peer
-    CLIENT_CONFIG_DNS="${CLIENT_DNS_1}, ${CLIENT_DNS_2}"
+    CLIENT_CONFIG_DNS="${CLIENT_IPV4_DNS_1}, ${CLIENT_IPV4_DNS_2}"
+    if [[ "$USE_IPV6" = 'y' ]]; then
+        CLIENT_CONFIG_DNS="${CLIENT_CONFIG_DNS}, ${CLIENT_IPV6_DNS_1}, ${CLIENT_IPV6_DNS_2}"
+    fi
 
     CLIENT_ADDRESS="${CLIENT_AWG_IPV4}/32"
-
     if [[ "$USE_IPV6" = 'y' ]]; then
         CLIENT_ADDRESS="${CLIENT_ADDRESS}, ${CLIENT_AWG_IPV6}/128"
     fi
