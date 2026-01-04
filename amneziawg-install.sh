@@ -224,7 +224,7 @@ function installQuestions() {
     done
 
     until [[ ${CLIENT_IPV4_DNS_2} =~ ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$ ]]; do
-        read -rp "Second Ipv4 DNS resolver to use for the clients (optional): " -e -i 1.0.0.1 CLIENT_IPV4_DNS_2
+        read -rp "Second IPv4 DNS resolver to use for the clients (optional): " -e -i 1.0.0.1 CLIENT_IPV4_DNS_2
         if [[ ${CLIENT_IPV4_DNS_2} == "" ]]; then
             CLIENT_IPV4_DNS_2="${CLIENT_IPV4_DNS_1}"
         fi
@@ -236,7 +236,7 @@ function installQuestions() {
         done
 
         until [[ ${CLIENT_IPV6_DNS_2} =~ ^([a-f0-9]{1,4}:){3,4}: ]]; do
-            read -rp "Second Ipv6 DNS resolver to use for the clients (optional): " -e -i 2606:4700:4700::1001 CLIENT_IPV6_DNS_2
+            read -rp "Second IPv6 DNS resolver to use for the clients (optional): " -e -i 2606:4700:4700::1001 CLIENT_IPV6_DNS_2
             if [[ ${CLIENT_IPV6_DNS_2} == "" ]]; then
                 CLIENT_IPV6_DNS_2="${CLIENT_IPV6_DNS_1}"
             fi
