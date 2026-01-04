@@ -434,15 +434,16 @@ PostDown = firewall-cmd --direct --remove-rule ipv6 filter FORWARD 0 -i ${SERVER
         echo "PostDown = firewall-cmd --zone=public --remove-port=${SERVER_PORT}/udp
 PostDown = firewall-cmd --zone=public --remove-interface=${SERVER_AWG_NIC}" >>"${SERVER_AWG_CONF}"
     elif [[ ${USE_NFTABLES} == 'y' ]]; then
-        echo "PostUp = nft add table inet amneziawg
-PostUp = nft add chain inet amneziawg input { type filter hook input priority 0 \; }
-PostUp = nft add rule inet amneziawg input udp dport ${SERVER_PORT} accept
-PostUp = nft add chain inet amneziawg forward { type filter hook forward priority 0 \; }
-PostUp = nft add rule inet amneziawg forward iifname \"${SERVER_PUB_NIC}\" oifname \"${SERVER_AWG_NIC}\" accept
-PostUp = nft add rule inet amneziawg forward iifname \"${SERVER_AWG_NIC}\" accept
-PostUp = nft add chain inet amneziawg postrouting { type nat hook postrouting priority 100 \; }
-PostUp = nft add rule inet amneziawg postrouting oifname \"${SERVER_PUB_NIC}\" masquerade
-PostDown = nft delete table inet amneziawg" >>"${SERVER_AWG_CONF}"
+        echo "PostUp = nft add rule inet filter input udp dport ${SERVER_PORT} accept
+PostUp = nft add rule inet filter forward iifname \"${SERVER_PUB_NIC}\" oifname \"${SERVER_AWG_NIC}\" accept
+PostUp = nft add rule inet filter forward iifname \"${SERVER_AWG_NIC}\" accept
+PostUp = nft add table inet ${SERVER_AWG_NIC}
+PostUp = nft add chain inet ${SERVER_AWG_NIC} postrouting { type nat hook postrouting priority srcnat\; }
+PostUp = nft add rule inet ${SERVER_AWG_NIC} postrouting oifname \"${SERVER_PUB_NIC}\" masquerade
+PreDown = nft -a list chain inet filter input | grep 'udp dport ${SERVER_PORT} accept' | awk '{print \$NF}' | xargs -r -n1 nft delete rule inet filter input handle
+PreDown = nft -a list chain inet filter forward | grep 'iifname \"${SERVER_PUB_NIC}\" oifname \"${SERVER_AWG_NIC}\" accept' | awk '{print \$NF}' | xargs -r -n1 nft delete rule inet filter forward handle
+PreDown = nft -a list chain inet filter forward | grep 'iifname \"${SERVER_AWG_NIC}\" accept' | awk '{print \$NF}' | xargs -r -n1 nft delete rule inet filter forward handle
+PreDown = nft delete table inet ${SERVER_AWG_NIC}" >>"${SERVER_AWG_CONF}"
     else
         echo "PostUp = iptables -I INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT
 PostUp = iptables -I FORWARD -i ${SERVER_PUB_NIC} -o ${SERVER_AWG_NIC} -j ACCEPT
