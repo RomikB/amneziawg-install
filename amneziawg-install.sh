@@ -434,16 +434,28 @@ PostDown = firewall-cmd --direct --remove-rule ipv6 filter FORWARD 0 -i ${SERVER
         echo "PostDown = firewall-cmd --zone=public --remove-port=${SERVER_PORT}/udp
 PostDown = firewall-cmd --zone=public --remove-interface=${SERVER_AWG_NIC}" >>"${SERVER_AWG_CONF}"
     elif [[ ${USE_NFTABLES} == 'y' ]]; then
-        echo "PostUp = nft add rule inet filter input udp dport ${SERVER_PORT} accept
-PostUp = nft add rule inet filter forward iifname \"${SERVER_PUB_NIC}\" oifname \"${SERVER_AWG_NIC}\" accept
-PostUp = nft add rule inet filter forward iifname \"${SERVER_AWG_NIC}\" accept
-PostUp = nft add table inet ${SERVER_AWG_NIC}
-PostUp = nft add chain inet ${SERVER_AWG_NIC} postrouting { type nat hook postrouting priority srcnat\; }
-PostUp = nft add rule inet ${SERVER_AWG_NIC} postrouting oifname \"${SERVER_PUB_NIC}\" masquerade
-PreDown = nft -a list chain inet filter input | grep 'udp dport ${SERVER_PORT} accept' | awk '{print \$NF}' | xargs -r -n1 nft delete rule inet filter input handle
-PreDown = nft -a list chain inet filter forward | grep 'iifname \"${SERVER_PUB_NIC}\" oifname \"${SERVER_AWG_NIC}\" accept' | awk '{print \$NF}' | xargs -r -n1 nft delete rule inet filter forward handle
-PreDown = nft -a list chain inet filter forward | grep 'iifname \"${SERVER_AWG_NIC}\" accept' | awk '{print \$NF}' | xargs -r -n1 nft delete rule inet filter forward handle
-PreDown = nft delete table inet ${SERVER_AWG_NIC}" >>"${SERVER_AWG_CONF}"
+        NFTABLES_SCRIPT_PATH="${AMNEZIAWG_DIR}/nft.sh"
+        echo "#!/bin/bash
+if [[ \$1 == 'up' ]]; then
+    if nft list table inet filter >/dev/null 2>&1; then
+        nft add rule inet filter input udp dport \$2 accept
+        nft add rule inet filter forward iifname \"\\\"\${3}\\\"\" oifname \"\\\"\${4}\\\"\" accept
+        nft add rule inet filter forward iifname \"\\\"\${4}\\\"\" accept
+    fi
+    nft add table inet \$4
+    nft add chain inet \$4 postrouting { type nat hook postrouting priority srcnat\\; }
+    nft add rule inet \$4 postrouting oifname \$3 masquerade
+elif [[ \$1 == 'down' ]]; then
+    if nft list table inet filter >/dev/null 2>&1; then
+        nft -a list chain inet filter input | grep \"udp dport \${2} accept\" | awk '{print \$NF}' | xargs -r -n1 nft delete rule inet filter input handle
+        nft -a list chain inet filter forward | grep \"iifname \\\"\${3}\\\" oifname \\\"\${4}\\\" accept\" | awk '{print \$NF}' | xargs -r -n1 nft delete rule inet filter forward handle
+        nft -a list chain inet filter forward | grep \"iifname \\\"\${4}\\\" accept\" | awk '{print \$NF}' | xargs -r -n1 nft delete rule inet filter forward handle
+    fi
+    nft list table inet \$4 2>/dev/null && nft delete table inet \$4
+fi" >"${NFTABLES_SCRIPT_PATH}"
+        chmod +x "${NFTABLES_SCRIPT_PATH}"
+        echo "PostUp = /etc/amnezia/amneziawg/nft.sh up ${SERVER_PORT} ${SERVER_PUB_NIC} ${SERVER_AWG_NIC}
+PreDown = /etc/amnezia/amneziawg/nft.sh down ${SERVER_PORT} ${SERVER_PUB_NIC} ${SERVER_AWG_NIC}" >>"${SERVER_AWG_CONF}"
     else
         echo "PostUp = iptables -I INPUT -p udp --dport ${SERVER_PORT} -j ACCEPT
 PostUp = iptables -I FORWARD -i ${SERVER_PUB_NIC} -o ${SERVER_AWG_NIC} -j ACCEPT
