@@ -177,7 +177,7 @@ function installQuestions() {
     echo ""
 
     until [[ ${USE_IPV6} =~ ^[yn]$ ]]; do
-        read -rp "Do you want to use IPv6? [y/n]: " -e -i n USE_IPV6
+        read -rp "Do you want to use IPv6? [y/n]: " -e -i y USE_IPV6
         USE_IPV6=${USE_IPV6,,}
     done
 
@@ -213,7 +213,7 @@ function installQuestions() {
     fi
 
     # Generate random number within private ports range
-    RANDOM_PORT=$(shuf -i49152-65535 -n1)
+    RANDOM_PORT=$(shuf -i39152-65535 -n1)
     until [[ ${SERVER_PORT} =~ ^[0-9]+$ ]] && [ "${SERVER_PORT}" -ge 1 ] && [ "${SERVER_PORT}" -le 65535 ]; do
         read -rp "Server AmneziaWG port [1-65535]: " -e -i "${RANDOM_PORT}" SERVER_PORT
     done
@@ -244,12 +244,12 @@ function installQuestions() {
     fi
 
     until [[ ${STORE_CLIENT} =~ ^[yn]$ ]]; do
-        read -rp "Store client config file at ${AMNEZIAWG_DIR}? [y/n]: " -e -i n STORE_CLIENT
+        read -rp "Store client config file at ${AMNEZIAWG_DIR}? [y/n]: " -e -i y STORE_CLIENT
         STORE_CLIENT=${STORE_CLIENT,,}
     done
 
     until [[ ${USE_NFTABLES} =~ ^[yn]$ ]]; do
-        read -rp "Use nftables instead of iptables? [y/n]: " -e -i n USE_NFTABLES
+        read -rp "Use nftables instead of iptables? [y/n]: " -e -i y USE_NFTABLES
         USE_NFTABLES=${USE_NFTABLES,,}
     done
 
@@ -267,7 +267,7 @@ function installQuestions() {
 
     # Keepalive interval
     until [[ ${KEEPALIVE} =~ ^[0-9]+$ ]] && [ "${KEEPALIVE}" -ge 0 ] && [ "${KEEPALIVE}" -le 65535 ]; do
-        read -rp "Keepalive interval [0-65535]: " -e -i 0 KEEPALIVE
+        read -rp "Keepalive interval [0-65535]: " -e -i 30 KEEPALIVE
     done
 
     # Jc
@@ -305,6 +305,13 @@ function installQuestions() {
         readH1AndH2AndH3AndH4
     done
 
+    # I1
+    RANDOM_AWG_I1=$(shuf -i3-1000 -n1)
+    local re='^(b[[:space:]]+0x[0-9A-Fa-f]+|c|t|r[[:space:]]+(1000|[1-9][0-9]{0,2}|0)|rc[[:space:]]+(1000|[1-9][0-9]{0,2}|0)|rd[[:space:]]+(1000|[1-9][0-9]{0,2}|0))$'
+    until [[ ${SERVER_AWG_I1} =~ $re ]]; do
+        read -rp "AmneziaWG require I1, read https://docs.amnezia.org/documentation/amnezia-wg/#how-it-works : " -e -i "<r ${RANDOM_AWG_I1}><t>" SERVER_AWG_I1
+    done
+
     echo ""
     echo "Okay, that was all I needed. We are ready to setup your AmneziaWG server now."
     echo "You will be able to generate a client at the end of the installation."
@@ -316,6 +323,23 @@ function installAmneziaWG() {
     installQuestions
 
     if [[ ${USE_NFTABLES} == 'y' ]]; then NF_PACKAGE="nftables"; else NF_PACKAGE="iptables"; fi
+
+    # Debian 12 (bookworm) → focal, Debian 13 (trixie) → noble
+    local codename ppa_codename
+    codename="${OS_CODENAME:-$(lsb_release -sc 2>/dev/null || echo "noble")}"
+    case "${OS}" in
+        debian)
+            case "$codename" in
+                bookworm) ppa_codename="focal" ;;
+                trixie)   ppa_codename="noble" ;;
+                *)        ppa_codename="noble" ;;
+            esac
+            log "Debian ($codename) → PPA codename: $ppa_codename"
+            ;;
+        *)
+            ppa_codename="$codename"
+            ;;
+    esac
 
     # Install AmneziaWG tools and module
     if [[ ${OS} == 'ubuntu' ]]; then
@@ -340,7 +364,7 @@ function installAmneziaWG() {
         curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x57290828" | gpg --dearmor --output "/etc/apt/keyrings/amneziawg-keyring.gpg"
         echo "Types: deb deb-src
 URIs: https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu
-Suites: focal
+Suites: ${ppa_codename}
 Components: main
 Signed-By: /etc/apt/keyrings/amneziawg-keyring.gpg
 " > "/etc/apt/sources.list.d/amneziawg.sources"
@@ -394,7 +418,8 @@ SERVER_AWG_S2=${SERVER_AWG_S2}
 SERVER_AWG_H1=${SERVER_AWG_H1}
 SERVER_AWG_H2=${SERVER_AWG_H2}
 SERVER_AWG_H3=${SERVER_AWG_H3}
-SERVER_AWG_H4=${SERVER_AWG_H4}" > "${AMNEZIAWG_DIR}/params"
+SERVER_AWG_H4=${SERVER_AWG_H4}
+SERVER_AWG_I1=\"${SERVER_AWG_I1}\"" > "${AMNEZIAWG_DIR}/params"
 
     # Add server interface
     SERVER_ADDRESS="${SERVER_AWG_IPV4}/24"
@@ -415,7 +440,8 @@ S2 = ${SERVER_AWG_S2}
 H1 = ${SERVER_AWG_H1}
 H2 = ${SERVER_AWG_H2}
 H3 = ${SERVER_AWG_H3}
-H4 = ${SERVER_AWG_H4}" >"${SERVER_AWG_CONF}"
+H4 = ${SERVER_AWG_H4}
+I1 = ${SERVER_AWG_I1}" >"${SERVER_AWG_CONF}"
 
     if pgrep firewalld; then
         echo "PostUp = firewall-cmd --zone=public --add-interface=${SERVER_AWG_NIC}
@@ -613,6 +639,7 @@ H1 = ${SERVER_AWG_H1}
 H2 = ${SERVER_AWG_H2}
 H3 = ${SERVER_AWG_H3}
 H4 = ${SERVER_AWG_H4}
+I1 = ${SERVER_AWG_I1}
 
 [Peer]
 PublicKey = ${SERVER_PUB_KEY}
