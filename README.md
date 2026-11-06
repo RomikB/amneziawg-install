@@ -6,14 +6,15 @@
 
 Supported distributions:
 
-- AlmaLinux >= 9
-- Debian >= 11
-- Rocky Linux >= 9
+- AlmaLinux >= 9*
+- CentOS Stream >= 9*
+- Debian >= 12
+- Fedora >= 43*
+- Red Hat Enterprise Linux (RHEL) >= 9*
+- Rocky Linux >= 9*
 - Ubuntu >= 22.04
 
-others can work but not tested
-
-2Gb of free space is required for temporary files.
+\* Uses packages from the community [tigro/amneziawg](https://copr.fedorainfracloud.org/coprs/tigro/amneziawg/) Copr repository (on Enterprise Linux 10, builds via DKMS and depends on upstream repository and kernel compatibility).
 
 ## Usage
 
