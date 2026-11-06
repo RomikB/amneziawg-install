@@ -135,6 +135,11 @@ function generateSParams() {
         RANDOM_AWG_S2=${RANDOM_AWG_S1}
         RANDOM_AWG_S3=${RANDOM_AWG_S1}
         RANDOM_AWG_S4=${RANDOM_AWG_S1}
+    elif [[ "${AWG_VERSION}" == "2.0" ]]; then
+        RANDOM_AWG_S1=$(shuf -i15-150 -n1)
+        RANDOM_AWG_S2=$(shuf -i15-150 -n1)
+        RANDOM_AWG_S3=$(shuf -i15-150 -n1)
+        RANDOM_AWG_S4=$(shuf -i15-150 -n1)
     else
         RANDOM_AWG_S1=$(shuf -i15-150 -n1)
         RANDOM_AWG_S2=$(shuf -i15-150 -n1)
@@ -169,14 +174,14 @@ function readSParams() {
     until [[ ${SERVER_AWG_S2} =~ ^[0-9]+$ ]] && (( SERVER_AWG_S2 >= min_s && SERVER_AWG_S2 <= 150 )); do
         read -rp "Server AmneziaWG S2 [${min_s}-150]: " -e -i ${default_s2} SERVER_AWG_S2
     done
-    if [[ "${AWG_VERSION}" == "3.1" ]]; then
+    if [[ "${AWG_VERSION}" != "1.0" ]]; then
         SERVER_AWG_S3=0
         SERVER_AWG_S4=0
-        until [[ ${SERVER_AWG_S3} =~ ^[0-9]+$ ]] && (( SERVER_AWG_S3 >= 12 && SERVER_AWG_S3 <= 150 )); do
-            read -rp "Server AmneziaWG S3 [12-150]: " -e -i ${default_s3} SERVER_AWG_S3
+        until [[ ${SERVER_AWG_S3} =~ ^[0-9]+$ ]] && (( SERVER_AWG_S3 >= min_s && SERVER_AWG_S3 <= 150 )); do
+            read -rp "Server AmneziaWG S3 [${min_s}-150]: " -e -i ${default_s3} SERVER_AWG_S3
         done
-        until [[ ${SERVER_AWG_S4} =~ ^[0-9]+$ ]] && (( SERVER_AWG_S4 >= 12 && SERVER_AWG_S4 <= 150 )); do
-            read -rp "Server AmneziaWG S4 [12-150]: " -e -i ${default_s4} SERVER_AWG_S4
+        until [[ ${SERVER_AWG_S4} =~ ^[0-9]+$ ]] && (( SERVER_AWG_S4 >= min_s && SERVER_AWG_S4 <= 150 )); do
+            read -rp "Server AmneziaWG S4 [${min_s}-150]: " -e -i ${default_s4} SERVER_AWG_S4
         done
     fi
 }
@@ -581,13 +586,16 @@ function installQuestions() {
         else
             SERVER_AWG_HPK=""
             SERVER_AWG_CPA=""
-            SERVER_AWG_S3=""
-            SERVER_AWG_S4=""
             SERVER_AWG_RANDOM_TRAILERS="n"
             SERVER_AWG_DISABLE_COOKIES="n"
         fi
 
-        # S1 && S2 (and S3 && S4 for AWG 3.1)
+        if [[ "${AWG_VERSION}" == "1.0" ]]; then
+            SERVER_AWG_S3=""
+            SERVER_AWG_S4=""
+        fi
+
+        # S1 && S2 (and S3 && S4 for AWG 2.0 and 3.1)
         if [[ "${AWG_VERSION}" == "3.1" && "${SERVER_AWG_RANDOM_TRAILERS}" == "y" ]]; then
             echo ""
             echo "Note: When RandomTrailers is enabled, AmneziaWG recommends setting S1 = S2 = S3 = S4."
@@ -639,6 +647,20 @@ function installQuestions() {
             SERVER_AWG_H2=2
             SERVER_AWG_H3=3
             SERVER_AWG_H4=4
+        elif [[ "${AWG_VERSION}" == "2.0" ]]; then
+            SERVER_AWG_MTU=1420
+            SERVER_AWG_HPK=""
+            SERVER_AWG_CPA=""
+            SERVER_AWG_RANDOM_TRAILERS="n"
+            SERVER_AWG_DISABLE_COOKIES="n"
+            SERVER_AWG_S1=${RANDOM_AWG_S1}
+            SERVER_AWG_S2=${RANDOM_AWG_S2}
+            SERVER_AWG_S3=${RANDOM_AWG_S3}
+            SERVER_AWG_S4=${RANDOM_AWG_S4}
+            SERVER_AWG_H1=${RANDOM_AWG_H1}
+            SERVER_AWG_H2=${RANDOM_AWG_H2}
+            SERVER_AWG_H3=${RANDOM_AWG_H3}
+            SERVER_AWG_H4=${RANDOM_AWG_H4}
         else
             SERVER_AWG_MTU=1420
             SERVER_AWG_HPK=""
@@ -798,6 +820,13 @@ H3 = ${SERVER_AWG_H3}
 H4 = ${SERVER_AWG_H4}
 HeaderProtectionKey = ${SERVER_AWG_HPK}
 ContentPaddingAddition = ${SERVER_AWG_CPA}" >>"${SERVER_AWG_CONF}"
+    elif [[ "${AWG_VERSION}" == "2.0" ]]; then
+        echo "S3 = ${SERVER_AWG_S3}
+S4 = ${SERVER_AWG_S4}
+H1 = ${SERVER_AWG_H1}
+H2 = ${SERVER_AWG_H2}
+H3 = ${SERVER_AWG_H3}
+H4 = ${SERVER_AWG_H4}" >>"${SERVER_AWG_CONF}"
     else
         echo "H1 = ${SERVER_AWG_H1}
 H2 = ${SERVER_AWG_H2}
@@ -1062,6 +1091,13 @@ H3 = ${SERVER_AWG_H3}
 H4 = ${SERVER_AWG_H4}
 HeaderProtectionKey = ${SERVER_AWG_HPK}
 ContentPaddingAddition = ${SERVER_AWG_CPA}" >> "${CLIENT_CONFIG}"
+    elif [[ "${AWG_VERSION}" == "2.0" ]]; then
+        echo "S3 = ${SERVER_AWG_S3}
+S4 = ${SERVER_AWG_S4}
+H1 = ${SERVER_AWG_H1}
+H2 = ${SERVER_AWG_H2}
+H3 = ${SERVER_AWG_H3}
+H4 = ${SERVER_AWG_H4}" >> "${CLIENT_CONFIG}"
     else
         echo "H1 = ${SERVER_AWG_H1}
 H2 = ${SERVER_AWG_H2}
