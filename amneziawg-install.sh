@@ -122,41 +122,61 @@ function readJminAndJmax() {
     SERVER_AWG_JMIN=0
     SERVER_AWG_JMAX=0
     until [[ ${SERVER_AWG_JMIN} =~ ^[0-9]+$ ]] && (( ${SERVER_AWG_JMIN} >= 1 )) && (( ${SERVER_AWG_JMIN} <= 1280 )); do
-        read -rp "Server AmneziaWG Jmin [1-1280]: " -e -i 50 SERVER_AWG_JMIN
+        read -rp "Server AmneziaWG Jmin [1-1280]: " -e -i 40 SERVER_AWG_JMIN
     done
     until [[ ${SERVER_AWG_JMAX} =~ ^[0-9]+$ ]] && (( ${SERVER_AWG_JMAX} >= 1 )) && (( ${SERVER_AWG_JMAX} <= 1280 )); do
-        read -rp "Server AmneziaWG Jmax [1-1280]: " -e -i 1000 SERVER_AWG_JMAX
+        read -rp "Server AmneziaWG Jmax [1-1280]: " -e -i 70 SERVER_AWG_JMAX
     done
 }
 
-function generateS1AndS2() {
-    RANDOM_AWG_S1=$(shuf -i15-150 -n1)
-    RANDOM_AWG_S2=$(shuf -i15-150 -n1)
-    RANDOM_AWG_S3=$(shuf -i15-150 -n1)
-    RANDOM_AWG_S4=$(shuf -i15-150 -n1)
+function generateSParams() {
+    if [[ "${AWG_VERSION}" == "3.1" ]]; then
+        RANDOM_AWG_S1=$(shuf -i12-150 -n1)
+        RANDOM_AWG_S2=${RANDOM_AWG_S1}
+        RANDOM_AWG_S3=${RANDOM_AWG_S1}
+        RANDOM_AWG_S4=${RANDOM_AWG_S1}
+    else
+        RANDOM_AWG_S1=$(shuf -i15-150 -n1)
+        RANDOM_AWG_S2=$(shuf -i15-150 -n1)
+        RANDOM_AWG_S3=""
+        RANDOM_AWG_S4=""
+    fi
 }
 
-function readS1AndS2() {
+function readSParams() {
     SERVER_AWG_S1=0
     SERVER_AWG_S2=0
     local min_s=15
+    local default_s2=${RANDOM_AWG_S2}
+    local default_s3=${RANDOM_AWG_S3}
+    local default_s4=${RANDOM_AWG_S4}
     if [[ "${AWG_VERSION}" == "3.1" ]]; then
         min_s=12
+        if [[ "${SERVER_AWG_RANDOM_TRAILERS}" == "y" ]]; then
+            default_s2=${RANDOM_AWG_S1}
+            default_s3=${RANDOM_AWG_S1}
+            default_s4=${RANDOM_AWG_S1}
+        fi
     fi
     until [[ ${SERVER_AWG_S1} =~ ^[0-9]+$ ]] && (( SERVER_AWG_S1 >= min_s && SERVER_AWG_S1 <= 150 )); do
         read -rp "Server AmneziaWG S1 [${min_s}-150]: " -e -i ${RANDOM_AWG_S1} SERVER_AWG_S1
     done
+    if [[ "${AWG_VERSION}" == "3.1" && "${SERVER_AWG_RANDOM_TRAILERS}" == "y" ]]; then
+        default_s2=${SERVER_AWG_S1}
+        default_s3=${SERVER_AWG_S1}
+        default_s4=${SERVER_AWG_S1}
+    fi
     until [[ ${SERVER_AWG_S2} =~ ^[0-9]+$ ]] && (( SERVER_AWG_S2 >= min_s && SERVER_AWG_S2 <= 150 )); do
-        read -rp "Server AmneziaWG S2 [${min_s}-150]: " -e -i ${RANDOM_AWG_S2} SERVER_AWG_S2
+        read -rp "Server AmneziaWG S2 [${min_s}-150]: " -e -i ${default_s2} SERVER_AWG_S2
     done
     if [[ "${AWG_VERSION}" == "3.1" ]]; then
         SERVER_AWG_S3=0
         SERVER_AWG_S4=0
         until [[ ${SERVER_AWG_S3} =~ ^[0-9]+$ ]] && (( SERVER_AWG_S3 >= 12 && SERVER_AWG_S3 <= 150 )); do
-            read -rp "Server AmneziaWG S3 [12-150]: " -e -i ${RANDOM_AWG_S3} SERVER_AWG_S3
+            read -rp "Server AmneziaWG S3 [12-150]: " -e -i ${default_s3} SERVER_AWG_S3
         done
         until [[ ${SERVER_AWG_S4} =~ ^[0-9]+$ ]] && (( SERVER_AWG_S4 >= 12 && SERVER_AWG_S4 <= 150 )); do
-            read -rp "Server AmneziaWG S4 [12-150]: " -e -i ${RANDOM_AWG_S4} SERVER_AWG_S4
+            read -rp "Server AmneziaWG S4 [12-150]: " -e -i ${default_s4} SERVER_AWG_S4
         done
     fi
 }
@@ -260,6 +280,66 @@ function readH1AndH2AndH3AndH4() {
     done
 }
 
+function validateIParam() {
+    local val="$1"
+    [[ -z "$val" ]] && return 1
+    local remaining="$val"
+    local tag_regex="^(<[bB] +0[xX]([0-9a-fA-F]{2})+>|<[rR] +[1-9][0-9]*>|<[rR][dD] +[1-9][0-9]*>|<[rR][cC] +[1-9][0-9]*>|<[tT]>)"
+    while [[ -n "$remaining" ]]; do
+        if [[ "$remaining" =~ $tag_regex ]]; then
+            local matched="${BASH_REMATCH[0]}"
+            remaining="${remaining:${#matched}}"
+        else
+            return 1
+        fi
+    done
+    return 0
+}
+
+function readIParams() {
+    SERVER_AWG_I1=""
+    SERVER_AWG_I2=""
+    SERVER_AWG_I3=""
+    SERVER_AWG_I4=""
+    SERVER_AWG_I5=""
+
+    echo ""
+    echo "Custom Protocol Signature (CPS) decoy packets (I1-I5):"
+    echo "Packets sent before handshake to mimic legitimate protocols (e.g. QUIC, DNS)."
+    echo "Supported tags:"
+    echo "  <b 0xHEX>  - static hex bytes (even number of hex digits, e.g. <b 0xd100000001>)"
+    echo "  <r SIZE>   - random bytes (e.g. <r 64>)"
+    echo "  <rd SIZE>  - random digits 0-9 (e.g. <rd 10>)"
+    echo "  <rc SIZE>  - random chars a-zA-Z (e.g. <rc 8>)"
+    echo "  <t>        - 4-byte UNIX timestamp"
+    echo "Leave empty (press Enter) to skip or finish the sequence."
+
+    local i
+    for i in 1 2 3 4 5; do
+        local input=""
+        while true; do
+            read -rp "AmneziaWG I${i} [optional, Enter to finish]: " -e input
+            input=$(echo "${input}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+            if [[ -z "${input}" ]]; then
+                return 0
+            fi
+            if validateIParam "${input}"; then
+                case "${i}" in
+                    1) SERVER_AWG_I1="${input}" ;;
+                    2) SERVER_AWG_I2="${input}" ;;
+                    3) SERVER_AWG_I3="${input}" ;;
+                    4) SERVER_AWG_I4="${input}" ;;
+                    5) SERVER_AWG_I5="${input}" ;;
+                esac
+                break
+            else
+                echo "Invalid syntax for I${i}! Allowed tags: <b 0xHEX>, <r SIZE>, <rd SIZE>, <rc SIZE>, <t>."
+                echo "Example: <b 0xd100000001><rc 8><t><r 50> or <r 64>. Press Enter without input to finish."
+            fi
+        done
+    done
+}
+
 function installQuestions() {
     echo "AmneziaWG server installer (https://github.com/romikb/amneziawg-install)"
     echo ""
@@ -276,6 +356,13 @@ function installQuestions() {
     SERVER_AWG_MTU=""
     SERVER_AWG_HPK=""
     SERVER_AWG_CPA=""
+    SERVER_AWG_RANDOM_TRAILERS=""
+    SERVER_AWG_DISABLE_COOKIES=""
+    SERVER_AWG_I1=""
+    SERVER_AWG_I2=""
+    SERVER_AWG_I3=""
+    SERVER_AWG_I4=""
+    SERVER_AWG_I5=""
     SERVER_AWG_S3=""
     SERVER_AWG_S4=""
     ADVANCED_SETTINGS=""
@@ -370,10 +457,10 @@ function installQuestions() {
     fi
 
     # Pre-generate base obfuscation parameters
-    RANDOM_AWG_JC=$(shuf -i3-10 -n1)
-    generateS1AndS2
+    RANDOM_AWG_JC=$(shuf -i4-8 -n1)
+    generateSParams
     while (( ${RANDOM_AWG_S1} + 56 == ${RANDOM_AWG_S2} )); do
-        generateS1AndS2
+        generateSParams
     done
     generateH1AndH2AndH3AndH4
     if [[ "${AWG_VERSION}" != "3.1" ]]; then
@@ -428,7 +515,7 @@ function installQuestions() {
         fi
 
         until [[ ${STORE_CLIENT} =~ ^[yn]$ ]]; do
-            read -rp "Store client config file at ${AMNEZIAWG_DIR}? [y/n]: " -e -i n STORE_CLIENT
+            read -rp "Store client config file at ${AMNEZIAWG_DIR}? [y/n]: " -e -i y STORE_CLIENT
             STORE_CLIENT=${STORE_CLIENT,,}
         done
 
@@ -465,13 +552,6 @@ function installQuestions() {
             readJminAndJmax
         done
 
-        # S1 && S2 (and S3 && S4 for AWG 3.1)
-        readS1AndS2
-        while (( ${SERVER_AWG_S1} + 56 == ${SERVER_AWG_S2} )); do
-            echo "AmneziaWG requires S1 + 56 <> S2"
-            readS1AndS2
-        done
-
         if [[ "${AWG_VERSION}" == "3.1" ]]; then
             echo ""
             echo "HeaderProtectionKey encrypts packet headers using ChaCha20 (AmneziaWG 3.1+)."
@@ -484,37 +564,77 @@ function installQuestions() {
             until [[ "${SERVER_AWG_CPA}" =~ ^[0-9]+(-[0-9]+)?$ ]]; do
                 read -rp "ContentPaddingAddition [e.g. 16-64]: " -e -i "16-64" SERVER_AWG_CPA
             done
+
+            echo ""
+            echo "RandomTrailers appends random-length padding to packets to disrupt size profiling (AmneziaWG 3.1+)."
+            until [[ ${SERVER_AWG_RANDOM_TRAILERS} =~ ^[yn]$ ]]; do
+                read -rp "Enable RandomTrailers? [y/n]: " -e -i y SERVER_AWG_RANDOM_TRAILERS
+                SERVER_AWG_RANDOM_TRAILERS=${SERVER_AWG_RANDOM_TRAILERS,,}
+            done
+
+            echo ""
+            echo "DisableCookies disables handshake cookie replies to evade active DPI probing (AmneziaWG 3.1+)."
+            until [[ ${SERVER_AWG_DISABLE_COOKIES} =~ ^[yn]$ ]]; do
+                read -rp "Enable DisableCookies? [y/n]: " -e -i y SERVER_AWG_DISABLE_COOKIES
+                SERVER_AWG_DISABLE_COOKIES=${SERVER_AWG_DISABLE_COOKIES,,}
+            done
         else
             SERVER_AWG_HPK=""
             SERVER_AWG_CPA=""
             SERVER_AWG_S3=""
             SERVER_AWG_S4=""
+            SERVER_AWG_RANDOM_TRAILERS="n"
+            SERVER_AWG_DISABLE_COOKIES="n"
         fi
+
+        # S1 && S2 (and S3 && S4 for AWG 3.1)
+        if [[ "${AWG_VERSION}" == "3.1" && "${SERVER_AWG_RANDOM_TRAILERS}" == "y" ]]; then
+            echo ""
+            echo "Note: When RandomTrailers is enabled, AmneziaWG recommends setting S1 = S2 = S3 = S4."
+        fi
+        readSParams
+        while (( ${SERVER_AWG_S1} + 56 == ${SERVER_AWG_S2} )); do
+            echo "AmneziaWG requires S1 + 56 <> S2"
+            readSParams
+        done
 
         # H1 && H2 && H3 && H4 (supports uint32 and intervals min-max)
         readH1AndH2AndH3AndH4
+
+        # I1-I5 Custom Protocol Signature (CPS) for AWG 3.1 and 2.0
+        if [[ "${AWG_VERSION}" != "1.0" ]]; then
+            readIParams
+        else
+            SERVER_AWG_I1=""
+            SERVER_AWG_I2=""
+            SERVER_AWG_I3=""
+            SERVER_AWG_I4=""
+            SERVER_AWG_I5=""
+        fi
     else
         # Standard mode automatic defaults
         USE_IPV6="n"
         SERVER_PUB_NIC="${SERVER_NIC:-eth0}"
         SERVER_AWG_NIC="awg0"
         SERVER_AWG_IPV4="10.66.66.1"
-        STORE_CLIENT="n"
+        STORE_CLIENT="y"
         USE_NFTABLES="y"
         ALLOWED_IPS="0.0.0.0/0"
         KEEPALIVE=0
         SERVER_AWG_JC=${RANDOM_AWG_JC}
-        SERVER_AWG_JMIN=50
-        SERVER_AWG_JMAX=1000
-        SERVER_AWG_S1=${RANDOM_AWG_S1}
-        SERVER_AWG_S2=${RANDOM_AWG_S2}
+        SERVER_AWG_JMIN=40
+        SERVER_AWG_JMAX=70
 
         if [[ "${AWG_VERSION}" == "3.1" ]]; then
             SERVER_AWG_MTU=1360
             SERVER_AWG_HPK="auto"
             SERVER_AWG_CPA="16-64"
-            SERVER_AWG_S3=${RANDOM_AWG_S3}
-            SERVER_AWG_S4=${RANDOM_AWG_S4}
+            SERVER_AWG_RANDOM_TRAILERS="y"
+            SERVER_AWG_DISABLE_COOKIES="y"
+            SERVER_AWG_S1=${RANDOM_AWG_S1}
+            SERVER_AWG_S2=${RANDOM_AWG_S1}
+            SERVER_AWG_S3=${RANDOM_AWG_S1}
+            SERVER_AWG_S4=${RANDOM_AWG_S1}
             SERVER_AWG_H1=1
             SERVER_AWG_H2=2
             SERVER_AWG_H3=3
@@ -523,6 +643,10 @@ function installQuestions() {
             SERVER_AWG_MTU=1420
             SERVER_AWG_HPK=""
             SERVER_AWG_CPA=""
+            SERVER_AWG_RANDOM_TRAILERS="n"
+            SERVER_AWG_DISABLE_COOKIES="n"
+            SERVER_AWG_S1=${RANDOM_AWG_S1}
+            SERVER_AWG_S2=${RANDOM_AWG_S2}
             SERVER_AWG_S3=""
             SERVER_AWG_S4=""
             SERVER_AWG_H1=${RANDOM_AWG_H1}
@@ -530,6 +654,11 @@ function installQuestions() {
             SERVER_AWG_H3=${RANDOM_AWG_H3}
             SERVER_AWG_H4=${RANDOM_AWG_H4}
         fi
+        SERVER_AWG_I1=""
+        SERVER_AWG_I2=""
+        SERVER_AWG_I3=""
+        SERVER_AWG_I4=""
+        SERVER_AWG_I5=""
     fi
 
     echo ""
@@ -611,6 +740,13 @@ AWG_VERSION=${AWG_VERSION}
 SERVER_AWG_MTU=${SERVER_AWG_MTU}
 SERVER_AWG_HPK=${SERVER_AWG_HPK}
 SERVER_AWG_CPA=${SERVER_AWG_CPA}
+SERVER_AWG_RANDOM_TRAILERS=${SERVER_AWG_RANDOM_TRAILERS}
+SERVER_AWG_DISABLE_COOKIES=${SERVER_AWG_DISABLE_COOKIES}
+SERVER_AWG_I1=\"${SERVER_AWG_I1}\"
+SERVER_AWG_I2=\"${SERVER_AWG_I2}\"
+SERVER_AWG_I3=\"${SERVER_AWG_I3}\"
+SERVER_AWG_I4=\"${SERVER_AWG_I4}\"
+SERVER_AWG_I5=\"${SERVER_AWG_I5}\"
 SERVER_PUB_IP=${SERVER_PUB_IP}
 SERVER_PUB_NIC=${SERVER_PUB_NIC}
 SERVER_AWG_NIC=${SERVER_AWG_NIC}
@@ -650,9 +786,6 @@ Address = ${SERVER_ADDRESS}
 ListenPort = ${SERVER_PORT}
 PrivateKey = ${SERVER_PRIV_KEY}
 MTU = ${SERVER_AWG_MTU}
-Jc = ${SERVER_AWG_JC}
-Jmin = ${SERVER_AWG_JMIN}
-Jmax = ${SERVER_AWG_JMAX}
 S1 = ${SERVER_AWG_S1}
 S2 = ${SERVER_AWG_S2}" >"${SERVER_AWG_CONF}"
 
@@ -670,6 +803,15 @@ ContentPaddingAddition = ${SERVER_AWG_CPA}" >>"${SERVER_AWG_CONF}"
 H2 = ${SERVER_AWG_H2}
 H3 = ${SERVER_AWG_H3}
 H4 = ${SERVER_AWG_H4}" >>"${SERVER_AWG_CONF}"
+    fi
+
+    # Append parameters only if they differ from configuration defaults
+    if [[ "${SERVER_AWG_RANDOM_TRAILERS}" == "y" ]]; then
+        echo "RandomTrailers = on" >>"${SERVER_AWG_CONF}"
+    fi
+
+    if [[ "${SERVER_AWG_DISABLE_COOKIES}" == "y" ]]; then
+        echo "DisableCookies = on" >>"${SERVER_AWG_CONF}"
     fi
 
     if systemctl is-active --quiet firewalld 2>/dev/null || pgrep -x firewalld >/dev/null 2>&1; then
@@ -927,6 +1069,23 @@ H3 = ${SERVER_AWG_H3}
 H4 = ${SERVER_AWG_H4}" >> "${CLIENT_CONFIG}"
     fi
 
+    # Append parameters only if they differ from configuration defaults
+    if [[ "${SERVER_AWG_RANDOM_TRAILERS}" == "y" ]]; then
+        echo "RandomTrailers = on" >> "${CLIENT_CONFIG}"
+    fi
+
+    if [[ "${SERVER_AWG_DISABLE_COOKIES}" == "y" ]]; then
+        echo "DisableCookies = on" >> "${CLIENT_CONFIG}"
+    fi
+
+    for i in 1 2 3 4 5; do
+        var="SERVER_AWG_I${i}"
+        val="${!var}"
+        if [[ -n "${val}" ]]; then
+            echo "I${i} = ${val}" >> "${CLIENT_CONFIG}"
+        fi
+    done
+
     echo "
 [Peer]
 PublicKey = ${SERVER_PUB_KEY}
@@ -1118,6 +1277,248 @@ function loadParams() {
     SERVER_AWG_CPA="${SERVER_AWG_CPA:-}"
     SERVER_AWG_S3="${SERVER_AWG_S3:-}"
     SERVER_AWG_S4="${SERVER_AWG_S4:-}"
+    SERVER_AWG_RANDOM_TRAILERS="${SERVER_AWG_RANDOM_TRAILERS:-n}"
+    SERVER_AWG_DISABLE_COOKIES="${SERVER_AWG_DISABLE_COOKIES:-n}"
+    SERVER_AWG_I1="${SERVER_AWG_I1:-}"
+    SERVER_AWG_I2="${SERVER_AWG_I2:-}"
+    SERVER_AWG_I3="${SERVER_AWG_I3:-}"
+    SERVER_AWG_I4="${SERVER_AWG_I4:-}"
+    SERVER_AWG_I5="${SERVER_AWG_I5:-}"
+}
+
+function changeParameters() {
+    echo ""
+    echo "Change parameters feature is not implemented yet."
+}
+
+function backupSettings() {
+    echo ""
+    echo "--- Backup AmneziaWG settings ---"
+
+    if [[ ! -f "${SERVER_AWG_CONF}" ]]; then
+        echo -e "${RED}Error: Server configuration file not found (${SERVER_AWG_CONF})!${NC}"
+        return 1
+    fi
+
+    local backup_file="$(pwd)/amneziawg-backup.tar.gz"
+
+    local backup_temp
+    backup_temp=$(mktemp -d)
+    if [[ ! -d "${backup_temp}" ]]; then
+        echo -e "${RED}Error: Failed to create temporary directory for backup.${NC}"
+        return 1
+    fi
+
+    # 1. Copy params
+    cp -f "${AMNEZIAWG_DIR}/params" "${backup_temp}/params"
+
+    # 2. Copy server config
+    cp -f "${SERVER_AWG_CONF}" "${backup_temp}/${SERVER_AWG_NIC}.conf"
+
+    # 3. Copy nft.sh if nftables is used or file exists
+    if [[ -f "${AMNEZIAWG_DIR}/nft.sh" ]]; then
+        cp -f "${AMNEZIAWG_DIR}/nft.sh" "${backup_temp}/nft.sh"
+    fi
+
+    # 4. Find and copy client config files (only those registered in server config)
+    mkdir -p "${backup_temp}/clients"
+
+    local client_names
+    client_names=$(grep -E "^### Client " "${SERVER_AWG_CONF}" | awk '{print $3}')
+    for client in ${client_names}; do
+        local cfg_file="${SERVER_AWG_NIC}-client-${client}.conf"
+        local expected_dir
+        expected_dir=$(getDirForClientConfig "${client}")
+        if [[ -f "${expected_dir}/${cfg_file}" ]]; then
+            cp -f "${expected_dir}/${cfg_file}" "${backup_temp}/clients/"
+        elif [[ -f "${AMNEZIAWG_DIR}/${cfg_file}" ]]; then
+            cp -f "${AMNEZIAWG_DIR}/${cfg_file}" "${backup_temp}/clients/"
+        elif [[ -f "/root/${cfg_file}" ]]; then
+            cp -f "/root/${cfg_file}" "${backup_temp}/clients/"
+        elif [[ -f "$(pwd)/${cfg_file}" ]]; then
+            cp -f "$(pwd)/${cfg_file}" "${backup_temp}/clients/"
+        else
+            for hdir in /home/*; do
+                if [[ -d "${hdir}" && -f "${hdir}/${cfg_file}" ]]; then
+                    cp -f "${hdir}/${cfg_file}" "${backup_temp}/clients/"
+                    break
+                fi
+            done
+        fi
+    done
+
+    local client_count
+    client_count=$(find "${backup_temp}/clients" -type f -name "*.conf" 2>/dev/null | wc -l)
+
+    # 5. Create archive
+    if tar -czf "${backup_file}" -C "${backup_temp}" .; then
+        chmod 600 "${backup_file}"
+        if [[ -n "${SUDO_USER}" && "${SUDO_USER}" != "root" ]]; then
+            chown "${SUDO_USER}:${SUDO_USER}" "${backup_file}" 2>/dev/null || true
+        fi
+        echo ""
+        echo -e "${GREEN}Backup created successfully!${NC}"
+        echo "Archive: ${backup_file}"
+        echo "Archive contents:"
+        echo "  - params"
+        echo "  - ${SERVER_AWG_NIC}.conf"
+        [[ -f "${backup_temp}/nft.sh" ]] && echo "  - nft.sh"
+        echo "  - Client configs: ${client_count} found and backed up"
+    else
+        echo -e "${RED}Error: Failed to create archive.${NC}"
+        rm -rf "${backup_temp}"
+        return 1
+    fi
+
+    rm -rf "${backup_temp}"
+}
+
+function restoreSettings() {
+    echo ""
+    echo "--- Restore AmneziaWG settings ---"
+
+    local backup_file="$(pwd)/amneziawg-backup.tar.gz"
+
+    if [[ ! -f "${backup_file}" ]]; then
+        echo -e "${RED}Backup archive not found: ${backup_file}${NC}"
+        echo "Please make sure 'amneziawg-backup.tar.gz' is located in the current directory ($(pwd))."
+        return 1
+    fi
+
+    echo "Found backup archive: ${backup_file}"
+
+    # Verify tar.gz archive
+    if ! tar -tzf "${backup_file}" >/dev/null 2>&1; then
+        echo -e "${RED}Error: The file is not a valid .tar.gz archive.${NC}"
+        return 1
+    fi
+
+    local restore_temp
+    restore_temp=$(mktemp -d)
+    if [[ ! -d "${restore_temp}" ]]; then
+        echo -e "${RED}Error: Failed to create temporary directory for extraction.${NC}"
+        return 1
+    fi
+
+    if ! tar -xzf "${backup_file}" -C "${restore_temp}"; then
+        echo -e "${RED}Error: Failed to extract archive.${NC}"
+        rm -rf "${restore_temp}"
+        return 1
+    fi
+
+    if [[ ! -f "${restore_temp}/params" ]]; then
+        echo -e "${RED}Error: Archive does not contain 'params' file! Restore aborted.${NC}"
+        rm -rf "${restore_temp}"
+        return 1
+    fi
+
+    local restored_nic
+    restored_nic=$(grep -E '^SERVER_AWG_NIC=' "${restore_temp}/params" | cut -d '=' -f 2 | tr -d '"'\'' ')
+    restored_nic="${restored_nic:-awg0}"
+
+    if [[ ! -f "${restore_temp}/${restored_nic}.conf" ]]; then
+        local found_conf
+        found_conf=$(find "${restore_temp}" -maxdepth 1 -name "*.conf" ! -name "*-client-*" | head -n 1)
+        if [[ -n "${found_conf}" ]]; then
+            cp -f "${found_conf}" "${restore_temp}/${restored_nic}.conf"
+        else
+            echo -e "${RED}Error: Archive does not contain server config (${restored_nic}.conf)! Restore aborted.${NC}"
+            rm -rf "${restore_temp}"
+            return 1
+        fi
+    fi
+
+    local restored_store_client
+    restored_store_client=$(grep -E '^STORE_CLIENT=' "${restore_temp}/params" | cut -d '=' -f 2 | tr -d '"'\'' ')
+    restored_store_client="${restored_store_client:-y}"
+
+    echo ""
+    echo -e "${ORANGE}WARNING: Restoring will overwrite current AmneziaWG configuration and client settings.${NC}"
+    echo "Restoring server interface: ${restored_nic}"
+    echo "Client storage mode (STORE_CLIENT): ${restored_store_client}"
+    local confirm_restore=""
+    read -rp "Are you sure you want to proceed? [y/n]: " -e confirm_restore
+    if [[ "${confirm_restore,,}" != "y" ]]; then
+        echo "Restore cancelled."
+        rm -rf "${restore_temp}"
+        return 0
+    fi
+
+    # Stop active service
+    if [[ -n "${SERVER_AWG_NIC}" ]] && systemctl is-active --quiet "awg-quick@${SERVER_AWG_NIC}" 2>/dev/null; then
+        systemctl stop "awg-quick@${SERVER_AWG_NIC}" 2>/dev/null || true
+    fi
+    if [[ "${restored_nic}" != "${SERVER_AWG_NIC}" ]] && systemctl is-active --quiet "awg-quick@${restored_nic}" 2>/dev/null; then
+        systemctl stop "awg-quick@${restored_nic}" 2>/dev/null || true
+    fi
+
+    # Ensure AMNEZIAWG_DIR exists
+    mkdir -p "${AMNEZIAWG_DIR}"
+    chmod 700 "${AMNEZIAWG_DIR}"
+
+    # 1. Restore params
+    cp -f "${restore_temp}/params" "${AMNEZIAWG_DIR}/params"
+    chmod 600 "${AMNEZIAWG_DIR}/params"
+    echo "  - Restored params to ${AMNEZIAWG_DIR}/params"
+
+    # 2. Restore server config
+    cp -f "${restore_temp}/${restored_nic}.conf" "${AMNEZIAWG_DIR}/${restored_nic}.conf"
+    chmod 600 "${AMNEZIAWG_DIR}/${restored_nic}.conf"
+    echo "  - Restored server config to ${AMNEZIAWG_DIR}/${restored_nic}.conf"
+
+    # 3. Restore nft.sh if present
+    if [[ -f "${restore_temp}/nft.sh" ]]; then
+        cp -f "${restore_temp}/nft.sh" "${AMNEZIAWG_DIR}/nft.sh"
+        chmod 755 "${AMNEZIAWG_DIR}/nft.sh"
+        echo "  - Restored nftables script to ${AMNEZIAWG_DIR}/nft.sh"
+    fi
+
+    # 4. Restore client configs with respect to STORE_CLIENT from backup
+    local client_count=0
+    while IFS= read -r -d '' client_file; do
+        local client_file_base
+        client_file_base=$(basename "${client_file}")
+        local cname=""
+        if [[ "${client_file_base}" =~ ^.*-client-(.+)\.conf$ ]]; then
+            cname="${BASH_REMATCH[1]}"
+        fi
+
+        local target_dir
+        if [[ "${restored_store_client}" == 'y' ]]; then
+            target_dir="${AMNEZIAWG_DIR}"
+        else
+            target_dir=$(getHomeDirForClient "${cname}")
+        fi
+
+        mkdir -p "${target_dir}"
+        cp -f "${client_file}" "${target_dir}/${client_file_base}"
+        chmod 600 "${target_dir}/${client_file_base}"
+        if [[ -n "${SUDO_USER}" && "${SUDO_USER}" != "root" && "${target_dir}" == /home/* ]]; then
+            chown "${SUDO_USER}:${SUDO_USER}" "${target_dir}/${client_file_base}" 2>/dev/null || true
+        fi
+        echo "  - Restored client config: ${client_file_base} -> ${target_dir}/"
+        client_count=$((client_count + 1))
+    done < <(find "${restore_temp}" -type f -name "*-client-*.conf" -print0)
+
+    rm -rf "${restore_temp}"
+
+    # Reload variables from restored params
+    loadParams
+
+    # Restart AmneziaWG service
+    echo ""
+    echo "Restarting AmneziaWG service..."
+    systemctl daemon-reload
+    systemctl restart "awg-quick@${SERVER_AWG_NIC}" 2>/dev/null || true
+    if systemctl is-active --quiet "awg-quick@${SERVER_AWG_NIC}"; then
+        echo -e "${GREEN}AmneziaWG (${SERVER_AWG_NIC}) is active and running!${NC}"
+    else
+        echo -e "${ORANGE}Service restart finished. You can verify status with: systemctl status awg-quick@${SERVER_AWG_NIC}${NC}"
+    fi
+
+    echo ""
+    echo -e "${GREEN}Restore completed successfully!${NC}"
+    echo "Total client configs restored: ${client_count}"
 }
 
 function manageMenu() {
@@ -1130,10 +1531,13 @@ function manageMenu() {
     echo "   2) List all users"
     echo "   3) Revoke existing user"
     echo "   4) Show client QR code"
-    echo "   5) Uninstall AmneziaWG"
-    echo "   6) Exit"
-    until [[ ${MENU_OPTION} =~ ^[1-6]$ ]]; do
-        read -rp "Select an option [1-6]: " MENU_OPTION
+    echo "   5) Change parameters"
+    echo "   6) Uninstall AmneziaWG"
+    echo "   7) Backup settings"
+    echo "   8) Restore settings"
+    echo "   9) Exit"
+    until [[ ${MENU_OPTION} =~ ^[1-9]$ ]]; do
+        read -rp "Select an option [1-9]: " MENU_OPTION
     done
     case "${MENU_OPTION}" in
     1)
@@ -1149,9 +1553,18 @@ function manageMenu() {
         showClientQR
         ;;
     5)
-        uninstallAmneziaWG
+        changeParameters
         ;;
     6)
+        uninstallAmneziaWG
+        ;;
+    7)
+        backupSettings
+        ;;
+    8)
+        restoreSettings
+        ;;
+    9)
         exit 0
         ;;
     esac
