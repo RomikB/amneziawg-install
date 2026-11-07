@@ -969,6 +969,134 @@ PostDown = ip6tables -t nat -D POSTROUTING -o ${SERVER_PUB_NIC} -j MASQUERADE" >
     fi
 }
 
+function generateClientConfigFile() {
+    local target_file="$1"
+    local priv_key="$2"
+    local address="$3"
+    local psk="$4"
+    local dns="$5"
+    local endpoint="$6"
+    local allowed_ips="$7"
+    local keepalive="$8"
+
+    local tmp_file="${target_file}.tmp"
+    echo "[Interface]
+PrivateKey = ${priv_key}
+Address = ${address}
+DNS = ${dns}
+MTU = ${SERVER_AWG_MTU}
+Jc = ${SERVER_AWG_JC}
+Jmin = ${SERVER_AWG_JMIN}
+Jmax = ${SERVER_AWG_JMAX}
+S1 = ${SERVER_AWG_S1}
+S2 = ${SERVER_AWG_S2}" > "${tmp_file}"
+
+    if [[ "${AWG_VERSION}" == "3.1" ]]; then
+        echo "S3 = ${SERVER_AWG_S3}
+S4 = ${SERVER_AWG_S4}
+H1 = ${SERVER_AWG_H1}
+H2 = ${SERVER_AWG_H2}
+H3 = ${SERVER_AWG_H3}
+H4 = ${SERVER_AWG_H4}
+HeaderProtectionKey = ${SERVER_AWG_HPK}
+ContentPaddingAddition = ${SERVER_AWG_CPA}" >> "${tmp_file}"
+    elif [[ "${AWG_VERSION}" == "2.0" ]]; then
+        echo "S3 = ${SERVER_AWG_S3}
+S4 = ${SERVER_AWG_S4}
+H1 = ${SERVER_AWG_H1}
+H2 = ${SERVER_AWG_H2}
+H3 = ${SERVER_AWG_H3}
+H4 = ${SERVER_AWG_H4}" >> "${tmp_file}"
+    else
+        echo "H1 = ${SERVER_AWG_H1}
+H2 = ${SERVER_AWG_H2}
+H3 = ${SERVER_AWG_H3}
+H4 = ${SERVER_AWG_H4}" >> "${tmp_file}"
+    fi
+
+    # Append parameters only if they differ from configuration defaults
+    if [[ "${SERVER_AWG_RANDOM_TRAILERS}" == "y" ]]; then
+        echo "RandomTrailers = on" >> "${tmp_file}"
+    fi
+
+    if [[ "${SERVER_AWG_DISABLE_COOKIES}" == "y" ]]; then
+        echo "DisableCookies = on" >> "${tmp_file}"
+    fi
+
+    local i
+    for i in 1 2 3 4 5; do
+        local var="SERVER_AWG_I${i}"
+        local val="${!var}"
+        if [[ -n "${val}" ]]; then
+            echo "I${i} = ${val}" >> "${tmp_file}"
+        fi
+    done
+
+    echo "
+[Peer]
+PublicKey = ${SERVER_PUB_KEY}" >> "${tmp_file}"
+
+    if [[ -n "${psk}" ]]; then
+        echo "PresharedKey = ${psk}" >> "${tmp_file}"
+    fi
+
+    echo "Endpoint = ${endpoint}
+AllowedIPs = ${allowed_ips}" >> "${tmp_file}"
+
+    if [[ -n "${keepalive}" && "${keepalive}" =~ ^[0-9]+$ && "${keepalive}" -gt 0 ]]; then
+        echo "PersistentKeepalive = ${keepalive}" >> "${tmp_file}"
+    fi
+
+    mv -f "${tmp_file}" "${target_file}"
+    chmod 600 "${target_file}"
+    if [[ -n "${SUDO_USER}" && "${SUDO_USER}" != "root" && "${target_file}" == /home/* ]]; then
+        chown "${SUDO_USER}:${SUDO_USER}" "${target_file}" 2>/dev/null || true
+    fi
+}
+
+function regenerateClientConfig() {
+    local target_file="$1"
+    if [[ ! -f "${target_file}" ]]; then
+        return 1
+    fi
+
+    local priv_key address psk dns endpoint allowed_ips keepalive
+    priv_key=$(grep -m1 -E '^[[:space:]]*PrivateKey[[:space:]]*=' "${target_file}" | cut -d= -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    address=$(grep -m1 -E '^[[:space:]]*Address[[:space:]]*=' "${target_file}" | cut -d= -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    psk=$(grep -m1 -E '^[[:space:]]*PresharedKey[[:space:]]*=' "${target_file}" | cut -d= -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    dns=$(grep -m1 -E '^[[:space:]]*DNS[[:space:]]*=' "${target_file}" | cut -d= -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    endpoint=$(grep -m1 -E '^[[:space:]]*Endpoint[[:space:]]*=' "${target_file}" | cut -d= -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    allowed_ips=$(grep -m1 -E '^[[:space:]]*AllowedIPs[[:space:]]*=' "${target_file}" | cut -d= -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    keepalive=$(grep -m1 -E '^[[:space:]]*PersistentKeepalive[[:space:]]*=' "${target_file}" | cut -d= -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+    if [[ -z "${priv_key}" || -z "${address}" ]]; then
+        echo -e "${ORANGE}Warning: Could not parse PrivateKey or Address from ${target_file}. Skipping.${NC}" >&2
+        return 1
+    fi
+
+    if [[ -z "${dns}" ]]; then
+        dns="${CLIENT_IPV4_DNS_1}, ${CLIENT_IPV4_DNS_2}"
+        if [[ "$USE_IPV6" = 'y' && -n "${CLIENT_IPV6_DNS_1}" ]]; then
+            dns="${dns}, ${CLIENT_IPV6_DNS_1}, ${CLIENT_IPV6_DNS_2}"
+        fi
+    fi
+
+    if [[ -z "${endpoint}" ]]; then
+        local ep_ip="${SERVER_PUB_IP}"
+        if [[ ${ep_ip} =~ .*:.* ]]; then
+            if [[ ${ep_ip} != *"["* ]] || [[ ${ep_ip} != *"]"* ]]; then
+                ep_ip="[${ep_ip}]"
+            fi
+        fi
+        endpoint="${ep_ip}:${SERVER_PORT}"
+    fi
+
+    allowed_ips="${allowed_ips:-${ALLOWED_IPS}}"
+    keepalive="${keepalive:-${KEEPALIVE}}"
+
+    generateClientConfigFile "${target_file}" "${priv_key}" "${address}" "${psk}" "${dns}" "${endpoint}" "${allowed_ips}" "${keepalive}"
+}
+
 function newClient() {
     CLIENT_NAME=""
     CLIENT_EXISTS=""
@@ -1071,67 +1199,7 @@ function newClient() {
         CLIENT_ADDRESS="${CLIENT_ADDRESS}, ${CLIENT_AWG_IPV6}/128"
     fi
 
-    echo "[Interface]
-PrivateKey = ${CLIENT_PRIV_KEY}
-Address = ${CLIENT_ADDRESS}
-DNS = ${CLIENT_CONFIG_DNS}
-MTU = ${SERVER_AWG_MTU}
-Jc = ${SERVER_AWG_JC}
-Jmin = ${SERVER_AWG_JMIN}
-Jmax = ${SERVER_AWG_JMAX}
-S1 = ${SERVER_AWG_S1}
-S2 = ${SERVER_AWG_S2}" > "${CLIENT_CONFIG}"
-
-    if [[ "${AWG_VERSION}" == "3.1" ]]; then
-        echo "S3 = ${SERVER_AWG_S3}
-S4 = ${SERVER_AWG_S4}
-H1 = ${SERVER_AWG_H1}
-H2 = ${SERVER_AWG_H2}
-H3 = ${SERVER_AWG_H3}
-H4 = ${SERVER_AWG_H4}
-HeaderProtectionKey = ${SERVER_AWG_HPK}
-ContentPaddingAddition = ${SERVER_AWG_CPA}" >> "${CLIENT_CONFIG}"
-    elif [[ "${AWG_VERSION}" == "2.0" ]]; then
-        echo "S3 = ${SERVER_AWG_S3}
-S4 = ${SERVER_AWG_S4}
-H1 = ${SERVER_AWG_H1}
-H2 = ${SERVER_AWG_H2}
-H3 = ${SERVER_AWG_H3}
-H4 = ${SERVER_AWG_H4}" >> "${CLIENT_CONFIG}"
-    else
-        echo "H1 = ${SERVER_AWG_H1}
-H2 = ${SERVER_AWG_H2}
-H3 = ${SERVER_AWG_H3}
-H4 = ${SERVER_AWG_H4}" >> "${CLIENT_CONFIG}"
-    fi
-
-    # Append parameters only if they differ from configuration defaults
-    if [[ "${SERVER_AWG_RANDOM_TRAILERS}" == "y" ]]; then
-        echo "RandomTrailers = on" >> "${CLIENT_CONFIG}"
-    fi
-
-    if [[ "${SERVER_AWG_DISABLE_COOKIES}" == "y" ]]; then
-        echo "DisableCookies = on" >> "${CLIENT_CONFIG}"
-    fi
-
-    for i in 1 2 3 4 5; do
-        var="SERVER_AWG_I${i}"
-        val="${!var}"
-        if [[ -n "${val}" ]]; then
-            echo "I${i} = ${val}" >> "${CLIENT_CONFIG}"
-        fi
-    done
-
-    echo "
-[Peer]
-PublicKey = ${SERVER_PUB_KEY}
-PresharedKey = ${CLIENT_PRE_SHARED_KEY}
-Endpoint = ${ENDPOINT}
-AllowedIPs = ${ALLOWED_IPS}" >> "${CLIENT_CONFIG}"
-
-    if [[ ${KEEPALIVE} -ne 0 ]]; then
-        echo "PersistentKeepalive = ${KEEPALIVE}" >>"${CLIENT_CONFIG}"
-    fi
+    generateClientConfigFile "${CLIENT_CONFIG}" "${CLIENT_PRIV_KEY}" "${CLIENT_ADDRESS}" "${CLIENT_PRE_SHARED_KEY}" "${CLIENT_CONFIG_DNS}" "${ENDPOINT}" "${ALLOWED_IPS}" "${KEEPALIVE}"
 
     # Add the client as a peer to the server
     echo -e "\n### Client ${CLIENT_NAME}
@@ -1322,9 +1390,170 @@ function loadParams() {
     SERVER_AWG_I5="${SERVER_AWG_I5:-}"
 }
 
-function changeParameters() {
+function editIParams() {
     echo ""
-    echo "Change parameters feature is not implemented yet."
+    echo "--- Change parameters: Custom Protocol Signature (I1-I5) ---"
+    echo "Current settings:"
+    local i
+    for i in 1 2 3 4 5; do
+        local var="SERVER_AWG_I${i}"
+        local val="${!var}"
+        if [[ -n "${val}" ]]; then
+            echo "  I${i}: ${val}"
+        else
+            echo "  I${i}: (not set)"
+        fi
+    done
+
+    echo ""
+    echo "Supported tags:"
+    echo "  <b 0xHEX>  - static hex bytes (even number of hex digits, e.g. <b 0xd100000001>)"
+    echo "  <r SIZE>   - random bytes (e.g. <r 64>)"
+    echo "  <rd SIZE>  - random digits 0-9 (e.g. <rd 10>)"
+    echo "  <rc SIZE>  - random chars a-zA-Z (e.g. <rc 8>)"
+    echo "  <t>        - 4-byte UNIX timestamp"
+    echo "Press Enter to keep current value, leave empty to finish/remove, or type 'q' to abort."
+
+    local new_i1=""
+    local new_i2=""
+    local new_i3=""
+    local new_i4=""
+    local new_i5=""
+
+    local prev_set=1
+    for i in 1 2 3 4 5; do
+        if [[ ${prev_set} -eq 0 ]]; then
+            break
+        fi
+
+        local var_cur="SERVER_AWG_I${i}"
+        local cur_val="${!var_cur}"
+
+        while true; do
+            local input=""
+            read -rp "AmneziaWG I${i} [optional, Enter to keep/finish]: " -e -i "${cur_val}" input
+            input=$(echo "${input}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+            if [[ "${input}" == "q" || "${input}" == "quit" || "${input}" == "cancel" ]]; then
+                echo "Aborted. No parameters were changed."
+                return 0
+            fi
+
+            if [[ -z "${input}" ]]; then
+                prev_set=0
+                break
+            fi
+
+            if validateIParam "${input}"; then
+                case "${i}" in
+                    1) new_i1="${input}" ;;
+                    2) new_i2="${input}" ;;
+                    3) new_i3="${input}" ;;
+                    4) new_i4="${input}" ;;
+                    5) new_i5="${input}" ;;
+                esac
+                break
+            else
+                echo "Invalid syntax for I${i}! Allowed tags: <b 0xHEX>, <r SIZE>, <rd SIZE>, <rc SIZE>, <t>."
+                echo "Example: <b 0xd100000001><rc 8><t><r 50> or <r 64>."
+            fi
+        done
+    done
+
+    # Check if anything changed
+    local changed=0
+    for i in 1 2 3 4 5; do
+        local var_old="SERVER_AWG_I${i}"
+        local var_new="new_i${i}"
+        if [[ "${!var_old}" != "${!var_new}" ]]; then
+            changed=1
+            break
+        fi
+    done
+
+    if [[ ${changed} -eq 0 ]]; then
+        echo ""
+        echo "No parameters were changed."
+        return 0
+    fi
+
+    echo ""
+    echo "Applying new I1-I5 parameters..."
+
+    # 1. Update /etc/amnezia/amneziawg/params
+    for i in 1 2 3 4 5; do
+        local var="new_i${i}"
+        local val="${!var}"
+        if grep -q "^SERVER_AWG_I${i}=" "${AMNEZIAWG_DIR}/params"; then
+            sed -i "s|^SERVER_AWG_I${i}=.*|SERVER_AWG_I${i}=\"${val}\"|" "${AMNEZIAWG_DIR}/params"
+        else
+            echo "SERVER_AWG_I${i}=\"${val}\"" >> "${AMNEZIAWG_DIR}/params"
+        fi
+    done
+    loadParams
+
+    # 2. Ensure server config has no I-parameters (they are client-only)
+    if [[ -f "${SERVER_AWG_CONF}" ]]; then
+        sed -i '/^I[1-5][[:space:]]*=/d' "${SERVER_AWG_CONF}"
+    fi
+
+    # 3. Regenerate all client configs
+    local client_count=0
+    local client_names=""
+    if [[ -f "${SERVER_AWG_CONF}" ]]; then
+        client_names=$(grep -E "^### Client " "${SERVER_AWG_CONF}" | awk '{print $3}')
+    fi
+
+    local client_files=()
+    for client in ${client_names}; do
+        local cfg_file="${SERVER_AWG_NIC}-client-${client}.conf"
+        local expected_dir
+        expected_dir=$(getDirForClientConfig "${client}")
+        for dir in "${expected_dir}" "${AMNEZIAWG_DIR}" "/root" "/home/${client}"; do
+            if [[ -f "${dir}/${cfg_file}" ]]; then
+                client_files+=("${dir}/${cfg_file}")
+            fi
+        done
+        for hdir in /home/*; do
+            if [[ -d "${hdir}" && -f "${hdir}/${cfg_file}" ]]; then
+                client_files+=("${hdir}/${cfg_file}")
+            fi
+        done
+    done
+
+    # Remove duplicates
+    local unique_files=()
+    if [[ ${#client_files[@]} -gt 0 ]]; then
+        while IFS= read -r f; do
+            unique_files+=("$f")
+        done < <(printf "%s\n" "${client_files[@]}" | sort -u)
+    fi
+
+    for cfile in "${unique_files[@]}"; do
+        if regenerateClientConfig "${cfile}"; then
+            echo "  - Regenerated: ${cfile}"
+            client_count=$((client_count + 1))
+        fi
+    done
+
+    echo ""
+    echo -e "${GREEN}Parameters updated successfully!${NC}"
+    echo "Updated params in: ${AMNEZIAWG_DIR}/params"
+    echo "Regenerated client configurations: ${client_count} file(s)"
+    echo ""
+    echo -e "${ORANGE}Note: Please update the configuration files or re-scan QR codes on your client devices.${NC}"
+}
+
+function changeParameters() {
+    if [[ "${AWG_VERSION}" == "1.0" ]]; then
+        echo ""
+        echo "--- Change parameters ---"
+        echo -e "${ORANGE}I1-I5 parameters are only supported in AmneziaWG 2.0 and 3.1.${NC}"
+        echo "Current protocol version is 1.0 (Legacy)."
+        return 0
+    fi
+
+    editIParams
 }
 
 function backupSettings() {
